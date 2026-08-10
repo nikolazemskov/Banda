@@ -1,11 +1,12 @@
-const CACHE="kolyagram-v7-6";
+const CACHE="kolyagram-v7-9";
 const STATIC=[
   "./manifest.webmanifest",
   "./icon-180.png",
   "./icon-512.png",
   "./config.js",
   "./kolyagram-logo.jpg",
-  "./message-fart.wav",
+  "./message-dota-match.mp3",
+  "./background-music.mp3",
   "./record-stop.wav",
   "./record-start.wav",
   "./egypt_01.png","./egypt_02.png","./egypt_03.png","./egypt_04.png","./egypt_05.png","./egypt_06.png",

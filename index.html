@@ -323,7 +323,10 @@ body.isRecording #recordingBar,body.isRecording #recordingBar *{visibility:visib
           <div class="brandLockup"><img class="brandLogo" src="./kolyagram-logo.jpg" alt=""><div class="brandName">КОЛЯГРАМ</div></div><div id="mode" style="display:none"></div>
         </div>
         
-<button id="testMessageSound" class="secondary" type="button" style="width:100%;margin-top:10px">💨 Проверить звук сообщения</button>
+
+<button id="toggleBackgroundMusic" class="secondary" type="button" style="width:100%;margin-top:10px">🎵 Фоновая музыка: Вкл</button>
+
+<button id="testMessageSound" class="secondary" type="button" style="width:100%;margin-top:10px">🎮 Проверить звук Dota</button>
 
 <button id="logout" class="circleBtn" aria-label="Выйти">↪</button>
       </div>
@@ -367,7 +370,7 @@ body.isRecording #recordingBar,body.isRecording #recordingBar *{visibility:visib
 <input id="avatarPhotoInput" type="file" accept="image/*" style="display:none">
 <label for="avatarPhotoInput" class="avatarPick" style="display:block;text-align:center;margin:12px 0 10px">Выбрать фото для аватарки</label>
 <button id="removeAvatarPhoto" class="secondary" style="width:100%;display:none;margin-bottom:10px">Удалить фото</button>
-<button id="copyInvite" class="secondary" style="width:100%">Показать код приглашения</button><div class="versionTag">КОЛЯГРАМ v7.6</div>
+<button id="copyInvite" class="secondary" style="width:100%">Показать код приглашения</button><div class="versionTag">КОЛЯГРАМ v7.9</div>
       </div>
     </div>
   </section>
@@ -441,7 +444,9 @@ body.isRecording #recordingBar,body.isRecording #recordingBar *{visibility:visib
 </div>
 <audio id="recordStartSound" src="./record-start.wav" preload="auto"></audio>
 <audio id="recordStopSound" src="./record-stop.wav" preload="auto"></audio>
-<audio id="messageSound" src="./message-fart.wav" preload="auto"></audio>
+<audio id="messageSound" src="./message-dota-match.mp3" preload="auto"></audio>
+<audio id="backgroundMusic" src="./background-music.mp3" preload="auto" loop></audio>
+
 
 
 <div id="photoViewer" class="photoViewer" aria-hidden="true">
@@ -801,7 +806,7 @@ document.addEventListener("touchend", e=>{
   lastTouchEnd=now;
 },{passive:false});
 
-if("serviceWorker" in navigator)navigator.serviceWorker.register("./sw.js?v=7.6");
+if("serviceWorker" in navigator)navigator.serviceWorker.register("./sw.js?v=7.9");
 if(me)enterHome();
 
 
@@ -1145,7 +1150,7 @@ document.addEventListener("touchend",unlockKolyagramSound,{once:true});
 document.getElementById("testMessageSound")?.addEventListener("click",async()=>{
   await unlockKolyagramSound();
   const a=document.getElementById("messageSound");
-  try{a.muted=false;a.volume=1;a.currentTime=0;await a.play();toast("💨 Пук проверен");}
+  try{a.muted=false;a.volume=1;a.currentTime=0;await a.play();toast("🎮 Звук Dota проверен");}
   catch(e){toast("iPhone заблокировал звук");}
 });
 
@@ -1227,6 +1232,85 @@ function playIncomingOnce(m){
   kolyaLastSoundMessageId=m.id;
   playIncomingSound();
 }
+
+
+const BG_MUSIC_KEY="kolyagram-bg-music";
+let bgMusicEnabled=localStorage.getItem(BG_MUSIC_KEY)!=="off";
+let bgMusicUnlocked=false;
+
+function bgAudio(){ return document.getElementById("backgroundMusic"); }
+
+function updateBgButton(){
+  const b=document.getElementById("toggleBackgroundMusic");
+  if(b)b.textContent=`🎵 Фоновая музыка: ${bgMusicEnabled?"Вкл":"Выкл"}`;
+}
+
+async function startBackgroundMusic(){
+  const a=bgAudio();
+  if(!a || !bgMusicEnabled)return;
+  a.loop=true;
+  a.volume=0.12;
+  try{
+    await a.play();
+    bgMusicUnlocked=true;
+  }catch(e){}
+}
+
+function stopBackgroundMusic(){
+  const a=bgAudio();
+  if(a)a.pause();
+}
+
+async function unlockBackgroundMusic(){
+  if(bgMusicUnlocked || !bgMusicEnabled)return;
+  await startBackgroundMusic();
+}
+
+document.addEventListener("click",unlockBackgroundMusic,{once:true});
+document.addEventListener("touchend",unlockBackgroundMusic,{once:true});
+
+document.getElementById("toggleBackgroundMusic")?.addEventListener("click",async()=>{
+  bgMusicEnabled=!bgMusicEnabled;
+  localStorage.setItem(BG_MUSIC_KEY,bgMusicEnabled?"on":"off");
+  updateBgButton();
+  if(bgMusicEnabled) await startBackgroundMusic();
+  else stopBackgroundMusic();
+});
+updateBgButton();
+
+// При возвращении в приложение продолжаем музыку, если iOS не убил аудио.
+document.addEventListener("visibilitychange",()=>{
+  if(document.visibilityState==="visible" && bgMusicEnabled) startBackgroundMusic();
+});
+
+// При проигрывании голосового фон ставим на паузу, после продолжаем.
+// Делегирование работает и для динамически созданных audio.
+document.addEventListener("play",e=>{
+  const el=e.target;
+  if(el instanceof HTMLAudioElement && el.id!=="backgroundMusic" && el.id!=="messageSound"){
+    const bg=bgAudio();
+    if(bg && !bg.paused){
+      bg.dataset.resumeAfterVoice="1";
+      bg.pause();
+    }
+  }
+},true);
+
+function resumeBgAfterVoice(){
+  const bg=bgAudio();
+  if(bg?.dataset.resumeAfterVoice==="1"){
+    bg.dataset.resumeAfterVoice="";
+    if(bgMusicEnabled) startBackgroundMusic();
+  }
+}
+document.addEventListener("ended",e=>{
+  const el=e.target;
+  if(el instanceof HTMLAudioElement && el.id!=="backgroundMusic" && el.id!=="messageSound") resumeBgAfterVoice();
+},true);
+document.addEventListener("pause",e=>{
+  const el=e.target;
+  if(el instanceof HTMLAudioElement && el.id!=="backgroundMusic" && el.id!=="messageSound") resumeBgAfterVoice();
+},true);
 
 </script>
 </body>
