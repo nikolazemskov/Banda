@@ -417,27 +417,15 @@ html,body{overscroll-behavior:none}
 @keyframes kjSpin{to{transform:rotate(360deg)}}
 </style>
 
-<style id="kolyajump-main-icon-v101">
-.kolyajumpMenuIcon,
-[data-game="kolyajump"] .gameIcon,
-[data-game="kolyajump"] .appIcon,
-#kolyajumpBtn .gameIcon,
-#kolyajumpBtn .appIcon,
-#kolyajumpBtn .icon{
-  background-image:url("./kolyajump-icon.jpg")!important;
-  background-size:cover!important;
-  background-position:center!important;
-  background-repeat:no-repeat!important;
-  color:transparent!important;
-  overflow:hidden!important;
+<style id="kj-game-tile-icon-v101">
+.kjGameTileIcon{
+  width:58px;height:58px;flex:0 0 58px;
+  border-radius:16px;overflow:hidden;
+  background:#071413;
+  box-shadow:0 5px 14px rgba(0,0,0,.16);
 }
-.kolyajumpMenuIcon img,
-[data-game="kolyajump"] .gameIcon img,
-[data-game="kolyajump"] .appIcon img,
-#kolyajumpBtn .gameIcon img,
-#kolyajumpBtn .appIcon img,
-#kolyajumpBtn .icon img{
-  width:100%!important;height:100%!important;object-fit:cover!important;
+.kjGameTileIcon img{
+  width:100%;height:100%;display:block;object-fit:cover;
 }
 </style>
 
@@ -474,7 +462,7 @@ html,body{overscroll-behavior:none}
       <div class="toprow">
         <div class="groupAvatar">Б</div>
         <div class="titleWrap">
-          <div class="brandLockup"><img class="brandLogo" src="./kolyajump-icon.jpg" alt=""><div class="brandName">КОЛЯГРАМ</div></div><div id="mode" style="display:none"></div>
+          <div class="brandLockup"><img class="brandLogo" src="./kolyagram-logo.jpg" alt=""><div class="brandName">КОЛЯГРАМ</div></div><div id="mode" style="display:none"></div>
         </div>
         
 
@@ -505,7 +493,7 @@ html,body{overscroll-behavior:none}
 
     <div id="gamesPanel" class="panel" style="display:none">
       <button id="openKolyaJump" class="chatRow" style="width:100%;text-align:left">
-        <div class="groupAvatar" style="background:linear-gradient(135deg,#81D8D0,#b8fff8);color:#07312e">↟</div>
+        <div class="kjGameTileIcon"><img src="./kolyajump-icon.jpg" alt="КоляДжамп"></div>
         <div class="body"><b>КоляДжамп</b><small>Прыгай выше · собирай бусты · бей рекорды</small></div>
         <span style="font-size:24px">›</span>
       </button>
@@ -1681,27 +1669,6 @@ document.addEventListener("touchend",unlockAllKolyagramAudio,{once:true});
 
 </script>
 
-
-
-<script id="kolyajump-main-icon-fallback-v101">
-document.addEventListener("DOMContentLoaded",()=>{
-  const all=[...document.querySelectorAll("button,a,div")];
-  const tile=all.find(el=>{
-    const t=(el.textContent||"").trim();
-    return /КоляДжамп/i.test(t) && t.length<120;
-  });
-  if(!tile)return;
-  const box=tile.querySelector(".gameIcon,.appIcon,.icon,[class*='icon'],img") || tile;
-  if(box.tagName==="IMG"){
-    box.src="./kolyajump-icon.jpg";
-  }else{
-    box.style.backgroundImage='url("./kolyajump-icon.jpg")';
-    box.style.backgroundSize="cover";
-    box.style.backgroundPosition="center";
-    box.style.backgroundRepeat="no-repeat";
-  }
-});
-</script>
 
 </body>
 </html>

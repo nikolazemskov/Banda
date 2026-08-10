@@ -5,7 +5,7 @@ const STATIC=[
   "./icon-512.png",
   "./config.js",
   "./kolyagram-logo.jpg",
-  "./kolyajump.html","./kolyajump-icon.jpg",
+  "./kolyajump.html",
   "./kolyajump-fart.mp3",
   "./kolyajump-burp.mp3",
   "./message-dota-match.mp3",
