@@ -274,6 +274,8 @@ body.isRecording #recordingBar,body.isRecording #recordingBar *{visibility:visib
     <input id="avatarTextInput" maxlength="4" value="К">
 
     <button id="join" class="primary">Войти</button>
+<div id="serverError" style="display:none;margin:10px 0 0;padding:12px 14px;border-radius:16px;background:#fff0f0;border:1px solid #ffcaca;color:#9f2020;font-size:13px;line-height:1.4;word-break:break-word"></div>
+
     <div class="hint">Демо-код: <b>КОЛЯГРАМ2026</b>. Для переписки между разными телефонами подключается бесплатный Supabase.</div>
   </section>
 
@@ -317,7 +319,7 @@ body.isRecording #recordingBar,body.isRecording #recordingBar *{visibility:visib
         <input id="avatarPhotoInput" type="file" accept="image/*" style="display:none">
 <label for="avatarPhotoInput" class="avatarPick" style="display:block;text-align:center;margin:12px 0 10px">Выбрать фото для аватарки</label>
 <button id="removeAvatarPhoto" class="secondary" style="width:100%;display:none;margin-bottom:10px">Удалить фото</button>
-<button id="copyInvite" class="secondary" style="width:100%">Показать код приглашения</button><div class="versionTag">КОЛЯГРАМ v7.0</div>
+<button id="copyInvite" class="secondary" style="width:100%">Показать код приглашения</button><div class="versionTag">КОЛЯГРАМ v7.1</div>
       </div>
     </div>
   </section>
@@ -409,18 +411,48 @@ let currentChat={type:"group",id:null,name:"Общий чат",avatar:"Б",avata
 let recorder=null,chunks=[],stream=null,recordStarted=0,timer=null;
 
 function toast(t){const el=$("#toast");el.textContent=t;el.classList.add("show");setTimeout(()=>el.classList.remove("show"),1700)}
+
+function showServerError(stage,error){
+  const el=$("#serverError");
+  const msg=error?.message || String(error || "Неизвестная ошибка");
+  const code=error?.code ? ` [${error.code}]` : "";
+  const status=error?.status ? ` HTTP ${error.status}` : "";
+  const details=error?.details ? `\n${error.details}` : "";
+  if(el){
+    el.style.display="block";
+    el.textContent=`${stage}: ${msg}${code}${status}${details}`;
+  }
+  toast("Ошибка сервера");
+}
+function clearServerError(){
+  const el=$("#serverError");
+  if(el){el.style.display="none";el.textContent="";}
+}
+
 function show(id){["login","home","chat"].forEach(x=>$("#"+x).classList.toggle("active",x===id))}
 function esc(s){return String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]))}
 function fmtTime(d){return new Intl.DateTimeFormat("ru-RU",{hour:"2-digit",minute:"2-digit"}).format(new Date(d))}
 function uuid(){return crypto.randomUUID?crypto.randomUUID():String(Date.now())+Math.random()}
 
 async function ensureAuth(){
-  if(!READY)return true;
-  const {data:{session}}=await supabase.auth.getSession();
-  if(session)return true;
-  const {error}=await supabase.auth.signInAnonymously();
-  if(error){toast("Сервер не пустил");return false}
-  return true;
+  if(!READY){
+    showServerError("Конфигурация","Supabase URL или publishable key не загружены");
+    return false;
+  }
+  clearServerError();
+  try{
+    const {data:{session},error:sessionError}=await supabase.auth.getSession();
+    if(sessionError){showServerError("Проверка сессии",sessionError);return false}
+    if(session)return true;
+
+    const {data,error}=await supabase.auth.signInAnonymously();
+    if(error){showServerError("Анонимный вход",error);return false}
+    if(!data?.user){showServerError("Анонимный вход","Supabase не вернул пользователя");return false}
+    return true;
+  }catch(e){
+    showServerError("Анонимный вход",e);
+    return false;
+  }
 }
 async function currentAuthId(){
   if(!READY)return me?.local_id||null;
@@ -428,29 +460,47 @@ async function currentAuthId(){
   return user?.id||null;
 }
 async function validCode(code){
-  if(!READY)return code.trim().toUpperCase()==="KOLYA2026";
+  if(!READY)return false;
   const {data,error}=await supabase.from("invite_codes").select("code").eq("code",code.trim()).eq("active",true).maybeSingle();
-  return !error&&!!data;
+  if(error){showServerError("Проверка кода приглашения",error);return false}
+  return !!data;
 }
 async function upsertProfile(){
   if(!READY){
     let users=JSON.parse(localStorage.getItem(LOCAL_USERS)||"[]");
     if(!users.some(u=>u.id===me.local_id))users.push({id:me.local_id,name:me.name,avatar:me.avatar});
     localStorage.setItem(LOCAL_USERS,JSON.stringify(users));
-    return;
+    return true;
   }
   const id=await currentAuthId();
-  await supabase.from("profiles").upsert({id,display_name:me.name,avatar:me.avatar,avatar_url:me.avatar_url||null,updated_at:new Date().toISOString()});
+  if(!id){showServerError("Профиль","Не получен id пользователя");return false}
+  const {error}=await supabase.from("profiles").upsert({id,display_name:me.name,avatar:me.avatar,avatar_url:me.avatar_url||null,updated_at:new Date().toISOString()});
+  if(error){showServerError("Сохранение профиля",error);return false}
+  return true;
 }
 $("#join").addEventListener("click",async()=>{
+  clearServerError();
   const code=$("#code").value.trim(),name=$("#name").value.trim(),avatar=$("#avatarTextInput").value.trim()||"🙂";
   if(!code||!name){toast("Нужны код и имя");return}
   if(!(await ensureAuth()))return;
-  if(!(await validCode(code))){toast("Код не подходит");return}
-  const id=await currentAuthId()||uuid();
+
+  const okCode=await validCode(code);
+  if(!okCode){
+    if($("#serverError")?.style.display!=="block")toast("Код не подходит");
+    return;
+  }
+
+  const id=await currentAuthId();
+  if(!id){showServerError("Вход","Не удалось получить id пользователя");return}
   me={name,avatar,code,local_id:id};
   localStorage.setItem("kolyagram.me",JSON.stringify(me));
-  await upsertProfile(); await enterHome();
+
+  if(!(await upsertProfile())){
+    localStorage.removeItem("kolyagram.me");
+    me=null;
+    return;
+  }
+  await enterHome();
 });
 $("#logout").addEventListener("click",()=>{localStorage.removeItem("kolyagram.me");me=null;show("login")});
 
@@ -648,7 +698,7 @@ document.addEventListener("touchend", e=>{
   lastTouchEnd=now;
 },{passive:false});
 
-if("serviceWorker" in navigator)navigator.serviceWorker.register("./sw.js?v=7.0");
+if("serviceWorker" in navigator)navigator.serviceWorker.register("./sw.js?v=7.1");
 if(me)enterHome();
 
 
@@ -837,6 +887,13 @@ function initVoicePlayers(){
 }
 new MutationObserver(()=>initVoicePlayers()).observe(document.getElementById("messages")||document.body,{childList:true,subtree:true});
 initVoicePlayers();
+
+
+window.addEventListener("load",()=>{
+  if(!READY){
+    showServerError("Конфигурация",`URL=${SUPABASE_URL ? "есть" : "нет"}, key=${SUPABASE_ANON_KEY ? "есть" : "нет"}`);
+  }
+});
 
 </script>
 </body>
