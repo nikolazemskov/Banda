@@ -264,6 +264,28 @@ body.isRecording #recordingBar,body.isRecording #recordingBar *{visibility:visib
 .deliveryState.read{color:#14b8b8}
 .unreadBadge{min-width:20px;height:20px;padding:0 6px;border-radius:999px;background:#18b7b9;color:#fff;font-size:11px;font-weight:900;display:grid;place-items:center}
 
+
+/* v7.6: стабильный рендер без моргания */
+.photoMessage{cursor:pointer}
+.photoViewer{
+  display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.92);
+  align-items:center;justify-content:center;padding:env(safe-area-inset-top) 12px env(safe-area-inset-bottom);
+}
+.photoViewer.show{display:flex}
+.photoViewerImg{max-width:100%;max-height:78vh;object-fit:contain;border-radius:14px}
+.photoViewerTop{
+  position:absolute;top:calc(env(safe-area-inset-top) + 10px);left:12px;right:12px;
+  display:flex;justify-content:space-between;align-items:center;gap:10px
+}
+.photoViewerBtn{
+  border:0;border-radius:14px;min-width:46px;height:46px;padding:0 14px;
+  background:rgba(255,255,255,.94);color:#111;font-weight:900;font-size:15px
+}
+.photoViewerActions{
+  position:absolute;bottom:calc(env(safe-area-inset-bottom) + 16px);
+  left:12px;right:12px;display:flex;justify-content:center;gap:10px
+}
+
 </style>
 </head>
 <body>
@@ -345,7 +367,7 @@ body.isRecording #recordingBar,body.isRecording #recordingBar *{visibility:visib
 <input id="avatarPhotoInput" type="file" accept="image/*" style="display:none">
 <label for="avatarPhotoInput" class="avatarPick" style="display:block;text-align:center;margin:12px 0 10px">Выбрать фото для аватарки</label>
 <button id="removeAvatarPhoto" class="secondary" style="width:100%;display:none;margin-bottom:10px">Удалить фото</button>
-<button id="copyInvite" class="secondary" style="width:100%">Показать код приглашения</button><div class="versionTag">КОЛЯГРАМ v7.5</div>
+<button id="copyInvite" class="secondary" style="width:100%">Показать код приглашения</button><div class="versionTag">КОЛЯГРАМ v7.6</div>
       </div>
     </div>
   </section>
@@ -420,6 +442,18 @@ body.isRecording #recordingBar,body.isRecording #recordingBar *{visibility:visib
 <audio id="recordStartSound" src="./record-start.wav" preload="auto"></audio>
 <audio id="recordStopSound" src="./record-stop.wav" preload="auto"></audio>
 <audio id="messageSound" src="./message-fart.wav" preload="auto"></audio>
+
+
+<div id="photoViewer" class="photoViewer" aria-hidden="true">
+  <div class="photoViewerTop">
+    <button id="closePhotoViewer" class="photoViewerBtn" type="button">✕</button>
+    <button id="sharePhotoViewer" class="photoViewerBtn" type="button">Поделиться</button>
+  </div>
+  <img id="photoViewerImg" class="photoViewerImg" alt="Фото">
+  <div class="photoViewerActions">
+    <button id="downloadPhotoViewer" class="photoViewerBtn" type="button">Скачать</button>
+  </div>
+</div>
 
 <div id="toast" class="toast"></div>
 
@@ -539,7 +573,6 @@ async function loadPeople(){
     const {data}=await supabase.from("profiles").select("id,display_name,avatar,avatar_url,updated_at").neq("id",myid).order("display_name");
     users=(data||[]).map(x=>({id:x.id,name:x.display_name,avatar:x.avatar||"🙂",avatar_url:x.avatar_url||null}));
 
-    // Последние сообщения + непрочитанные для личных чатов
     const {data:recent}=await supabase.from("messages")
       .select("id,sender_id,recipient_id,kind,text,created_at,read_at")
       .or(`sender_id.eq.${myid},recipient_id.eq.${myid}`)
@@ -551,13 +584,20 @@ async function loadPeople(){
         (m.sender_id===myid && m.recipient_id===u.id) ||
         (m.sender_id===u.id && m.recipient_id===myid)
       );
-      const last=msgs[0];
-      u.last=last||null;
+      u.last=msgs[0]||null;
       u.unread=msgs.filter(m=>m.sender_id===u.id && m.recipient_id===myid && !m.read_at).length;
     });
   }else{
     users=JSON.parse(localStorage.getItem(LOCAL_USERS)||"[]").filter(x=>x.id!==me.local_id);
   }
+
+  const sig=kolyaSignature(users.map(u=>({
+    id:u.id,name:u.name,avatar:u.avatar,avatar_url:u.avatar_url,
+    last:u.last?{id:u.last.id,kind:u.last.kind,text:u.last.text,created_at:u.last.created_at,read_at:u.last.read_at}:null,
+    unread:u.unread||0
+  })));
+  if(sig===kolyaPeopleSignature)return;
+  kolyaPeopleSignature=sig;
 
   const preview=m=>{
     if(!m)return "Личный чат";
@@ -633,19 +673,28 @@ function msgHTML(m){
   const mine=(m.sender_id===window.KOLYA_MY_ID);
   const avatar=m.sender_avatar||m.sender_name?.[0]||"•";
   let content="";
-  if(m.kind==="photo"&&m.media_url)content=`<div class="bubble ${mine?"mine":"other"} photoBubble"><img src="${esc(m.media_url)}" alt="Фото"><div class="meta">${fmtTime(m.created_at)}${deliveryHTML(m,mine)}</div></div>`;
+  if(m.kind==="photo"&&m.media_url)content=`<div class="bubble ${mine?"mine":"other"} photoBubble"><img src="${esc(m.media_url)}" alt="Фото" class="photoMessage" data-full-photo="${esc(m.media_url)}"><div class="meta">${fmtTime(m.created_at)}${deliveryHTML(m,mine)}</div></div>`;
   else if(m.kind==="voice"&&m.media_url)content=`<div class="bubble ${mine?"mine":"other"}"><div class="voice voiceV66" data-voice-url="${esc(m.media_url)}"><button class="play voicePlayV66" type="button">▶</button><div class="voiceBodyV66"><input class="voiceSeekV66" type="range" min="0" max="1000" value="0" step="1"><div class="voiceInfoV66"><span class="voiceClockV66">00:00 / --:--</span><button class="voiceSpeedV66" type="button">1×</button></div></div></div><div class="meta">${fmtTime(m.created_at)}${deliveryHTML(m,mine)}</div></div>`;
-  else if(m.kind==="sticker"&&m.media_url)content=`<div class="stickerMsg"><img src="${esc(m.media_url)}" alt="Эмодзи БАНДЫ"><div class="stickerMeta">${fmtTime(m.created_at)}${deliveryHTML(m,mine)}</div></div>`;
+  else if(m.kind==="sticker"&&m.media_url)content=`<div class="stickerMsg"><img src="${esc(m.media_url)}" alt="Эмодзи БАНДЫ" class="photoMessage" data-full-photo="${esc(m.media_url)}"><div class="stickerMeta">${fmtTime(m.created_at)}${deliveryHTML(m,mine)}</div></div>`;
   else content=`<div class="bubble ${mine?"mine":"other"}">${mine?"":`<div class="sender">${esc(m.sender_profile_name||m.sender_name)}</div>`}<div class="msgtext">${esc(m.text)}</div><div class="meta">${fmtTime(m.created_at)}${deliveryHTML(m,mine)}</div></div>`;
   return `<div class="msgrow ${mine?"mine":""}">${mine?"":(m.sender_avatar_url?`<img class="avatar serverAvatar" src="${esc(m.sender_avatar_url)}" alt="">`:`<div class="avatar">${esc(avatar)}</div>`)}${content}</div>`;
 }
 async function loadMessages(){
   if(READY && !window.KOLYA_MY_ID) window.KOLYA_MY_ID=await currentAuthId();
   const arr=await fetchMessages();
-  $("#messages").innerHTML='<div class="dayline">Сегодня</div>'+arr.map(msgHTML).join("");
-  const box=$("#messages");
-  if(box) box.scrollTop=box.scrollHeight;
-  window.scrollTo({top:document.body.scrollHeight,behavior:"instant"});
+  const sig=kolyaSignature(arr.map(m=>({
+    id:m.id,sender_id:m.sender_id,kind:m.kind,text:m.text,media_url:m.media_url,
+    created_at:m.created_at,delivered_at:m.delivered_at,read_at:m.read_at,
+    sender_profile_name:m.sender_profile_name,sender_avatar_url:m.sender_avatar_url
+  })));
+
+  if(sig!==kolyaMessagesSignature){
+    kolyaMessagesSignature=sig;
+    $("#messages").innerHTML='<div class="dayline">Сегодня</div>'+arr.map(msgHTML).join("");
+    bindPhotoViewer($("#messages"));
+    const box=$("#messages");
+    if(box)box.scrollTop=box.scrollHeight;
+  }
   if(READY) await markVisibleMessages();
 }
 async function baseMessage(kind,text="",url=null){
@@ -752,7 +801,7 @@ document.addEventListener("touchend", e=>{
   lastTouchEnd=now;
 },{passive:false});
 
-if("serviceWorker" in navigator)navigator.serviceWorker.register("./sw.js?v=7.5");
+if("serviceWorker" in navigator)navigator.serviceWorker.register("./sw.js?v=7.6");
 if(me)enterHome();
 
 
@@ -1049,7 +1098,7 @@ async function startRealtime(){
       .on("postgres_changes",{event:"*",schema:"public",table:"messages"},async payload=>{
         const m=payload.new||payload.old||{};
         if(payload.eventType==="INSERT" && m.sender_id && m.sender_id!==myid){
-          playIncomingSound();
+          playIncomingOnce(m);
           showIncomingNotification(m);
         }
         await loadPeople();
@@ -1073,7 +1122,7 @@ async function startRealtime(){
         await loadPeople();
         if(document.getElementById("chat")?.classList.contains("active")) await loadMessages();
       }catch(e){}
-    },1200);
+    },2200);
   }
 }
 
@@ -1099,6 +1148,85 @@ document.getElementById("testMessageSound")?.addEventListener("click",async()=>{
   try{a.muted=false;a.volume=1;a.currentTime=0;await a.play();toast("💨 Пук проверен");}
   catch(e){toast("iPhone заблокировал звук");}
 });
+
+
+let kolyaPeopleSignature="";
+let kolyaMessagesSignature="";
+
+function kolyaSignature(value){
+  try{return JSON.stringify(value)}catch(e){return String(Date.now())}
+}
+
+function bindPhotoViewer(root=document){
+  root.querySelectorAll?.(".photoMessage[data-full-photo]").forEach(img=>{
+    if(img.dataset.viewerBound==="1")return;
+    img.dataset.viewerBound="1";
+    img.addEventListener("click",()=>{
+      const viewer=document.getElementById("photoViewer");
+      const full=document.getElementById("photoViewerImg");
+      if(!viewer||!full)return;
+      full.src=img.dataset.fullPhoto;
+      viewer.dataset.url=img.dataset.fullPhoto;
+      viewer.classList.add("show");
+      viewer.setAttribute("aria-hidden","false");
+    });
+  });
+}
+function closePhotoViewer(){
+  const viewer=document.getElementById("photoViewer");
+  const full=document.getElementById("photoViewerImg");
+  if(viewer){viewer.classList.remove("show");viewer.setAttribute("aria-hidden","true");viewer.dataset.url="";}
+  if(full)full.removeAttribute("src");
+}
+document.getElementById("closePhotoViewer")?.addEventListener("click",closePhotoViewer);
+document.getElementById("photoViewer")?.addEventListener("click",e=>{
+  if(e.target?.id==="photoViewer")closePhotoViewer();
+});
+
+async function currentPhotoFile(){
+  const url=document.getElementById("photoViewer")?.dataset.url;
+  if(!url)return null;
+  const res=await fetch(url);
+  if(!res.ok)throw new Error("Фото не загрузилось");
+  const blob=await res.blob();
+  const type=blob.type||"image/jpeg";
+  const ext=type.includes("png")?"png":type.includes("webp")?"webp":"jpg";
+  return {url,blob,file:new File([blob],`kolyagram-${Date.now()}.${ext}`,{type})};
+}
+document.getElementById("sharePhotoViewer")?.addEventListener("click",async()=>{
+  try{
+    const x=await currentPhotoFile();
+    if(navigator.share && navigator.canShare?.({files:[x.file]})){
+      await navigator.share({files:[x.file],title:"Фото из КОЛЯГРАМА"});
+    }else if(navigator.share){
+      await navigator.share({url:x.url,title:"Фото из КОЛЯГРАМА"});
+    }else{
+      window.open(x.url,"_blank");
+    }
+  }catch(e){toast("Не удалось поделиться")}
+});
+document.getElementById("downloadPhotoViewer")?.addEventListener("click",async()=>{
+  try{
+    const x=await currentPhotoFile();
+    const objectUrl=URL.createObjectURL(x.blob);
+    const a=document.createElement("a");
+    a.href=objectUrl;
+    a.download=x.file.name;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(()=>URL.revokeObjectURL(objectUrl),1500);
+    toast("Фото готово к сохранению");
+  }catch(e){toast("Не удалось скачать фото")}
+});
+
+
+let kolyaLastSoundMessageId=null;
+function playIncomingOnce(m){
+  if(!m || !m.id || m.id===kolyaLastSoundMessageId)return;
+  kolyaLastSoundMessageId=m.id;
+  playIncomingSound();
+}
 
 </script>
 </body>
