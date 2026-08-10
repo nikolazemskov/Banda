@@ -1,4 +1,4 @@
-const CACHE="kolyagram-v9-3-cutout-heroes";
+const CACHE="kolyagram-v9-4-embedded-assets";
 const STATIC=[
   "./manifest.webmanifest",
   "./icon-180.png",
