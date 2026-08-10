@@ -1,11 +1,11 @@
-const CACHE="kolyagram-v10-0-chat-card";
+const CACHE="kolyagram-v10-1-game-icon";
 const STATIC=[
   "./manifest.webmanifest",
   "./icon-180.png",
   "./icon-512.png",
   "./config.js",
   "./kolyagram-logo.jpg",
-  "./kolyajump.html",
+  "./kolyajump.html","./kolyajump-icon.jpg",
   "./kolyajump-fart.mp3",
   "./kolyajump-burp.mp3",
   "./message-dota-match.mp3",
