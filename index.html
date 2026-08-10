@@ -237,6 +237,16 @@ body.isRecording #recordingBar,body.isRecording #recordingBar *{visibility:visib
 .voiceSpeed{flex:0 0 auto!important;margin-left:0!important}
 .voiceNativeHidden{display:none!important}
 
+
+/* v6.6 real voice player: attaches to rendered data-voice-url messages */
+.voiceV66{display:flex!important;align-items:center!important;gap:10px!important;min-width:255px!important}
+.voicePlayV66{width:46px!important;height:46px!important;flex:0 0 46px!important;border:0!important;border-radius:50%!important;background:#8ed8d5!important;color:#102c2c!important;font-size:17px!important;font-weight:900!important}
+.voiceBodyV66{flex:1;min-width:0;display:flex;flex-direction:column;gap:5px}
+.voiceSeekV66{display:block;width:100%;height:20px;margin:0;accent-color:#62c4c0}
+.voiceInfoV66{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.voiceClockV66{font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
+.voiceSpeedV66{border:0;border-radius:9px;padding:4px 8px;background:rgba(98,196,192,.14);color:#278e8a;font-size:12px;font-weight:900}
+
 </style>
 </head>
 <body>
@@ -304,7 +314,7 @@ body.isRecording #recordingBar,body.isRecording #recordingBar *{visibility:visib
         <input id="avatarPhotoInput" type="file" accept="image/*" style="display:none">
 <label for="avatarPhotoInput" class="avatarPick" style="display:block;text-align:center;margin:12px 0 10px">Выбрать фото для аватарки</label>
 <button id="removeAvatarPhoto" class="secondary" style="width:100%;display:none;margin-bottom:10px">Удалить фото</button>
-<button id="copyInvite" class="secondary" style="width:100%">Показать код приглашения</button><div class="versionTag">КОЛЯГРАМ v6.5</div>
+<button id="copyInvite" class="secondary" style="width:100%">Показать код приглашения</button><div class="versionTag">КОЛЯГРАМ v6.6</div>
       </div>
     </div>
   </section>
@@ -501,7 +511,7 @@ function msgHTML(m){
   const avatar=m.sender_avatar||m.sender_name?.[0]||"•";
   let content="";
   if(m.kind==="photo"&&m.media_url)content=`<div class="bubble ${mine?"mine":"other"} photoBubble"><img src="${esc(m.media_url)}" alt="Фото"><div class="meta">${fmtTime(m.created_at)}</div></div>`;
-  else if(m.kind==="voice"&&m.media_url)content=`<div class="bubble ${mine?"mine":"other"}"><div class="voice"><button class="play" data-audio="${esc(m.media_url)}">▶</button><div style="flex:1">${wave()}<div class="voiceTime">Голосовое</div></div></div><div class="meta">${fmtTime(m.created_at)}</div></div>`;
+  else if(m.kind==="voice"&&m.media_url)content=`<div class="bubble ${mine?"mine":"other"}"><div class="voice voiceV66" data-voice-url="${esc(m.media_url)}"><button class="play voicePlayV66" type="button">▶</button><div class="voiceBodyV66"><input class="voiceSeekV66" type="range" min="0" max="1000" value="0" step="1"><div class="voiceInfoV66"><span class="voiceClockV66">00:00 / --:--</span><button class="voiceSpeedV66" type="button">1×</button></div></div></div><div class="meta">${fmtTime(m.created_at)}</div></div>`;
   else if(m.kind==="sticker"&&m.media_url)content=`<div class="stickerMsg"><img src="${esc(m.media_url)}" alt="Эмодзи БАНДЫ"><div class="stickerMeta">${fmtTime(m.created_at)}${mine?" ✓✓":""}</div></div>`;
   else content=`<div class="bubble ${mine?"mine":"other"}">${mine?"":`<div class="sender">${esc(m.sender_name)}</div>`}<div class="msgtext">${esc(m.text)}</div><div class="meta">${fmtTime(m.created_at)}${mine?" ✓✓":""}</div></div>`;
   return `<div class="msgrow ${mine?"mine":""}">${mine?"":`<div class="avatar">${esc(avatar)}</div>`}${content}</div>`;
@@ -509,9 +519,7 @@ function msgHTML(m){
 async function loadMessages(){
   const arr=await fetchMessages();
   $("#messages").innerHTML='<div class="dayline">Сегодня</div>'+arr.map(msgHTML).join("");
-  document.querySelectorAll("[data-audio]").forEach(b=>b.addEventListener("click",()=>{
-    const a=new Audio(b.dataset.audio);a.play();b.textContent="❚❚";a.onended=()=>b.textContent="▶";
-  }));
+  
   window.scrollTo({top:document.body.scrollHeight,behavior:"instant"});
 }
 async function baseMessage(kind,text="",url=null){
@@ -618,7 +626,7 @@ document.addEventListener("touchend", e=>{
   lastTouchEnd=now;
 },{passive:false});
 
-if("serviceWorker" in navigator)navigator.serviceWorker.register("./sw.js?v=6.5");
+if("serviceWorker" in navigator)navigator.serviceWorker.register("./sw.js?v=6.6");
 if(me)enterHome();
 
 
@@ -732,93 +740,72 @@ document.getElementById("sendRecord")?.addEventListener("click",()=>{
 
 
 
-(function(){
-  const systemIds=new Set(["recordStartSound","recordStopSound","messageSound"]);
-  let activeAudio=null;
 
-  function fmt(v){
-    if(!Number.isFinite(v)||v<0)return "00:00";
-    const m=Math.floor(v/60),s=Math.floor(v%60);
-    return String(m).padStart(2,"0")+":"+String(s).padStart(2,"0");
-  }
 
-  function pauseOthers(audio){
-    document.querySelectorAll("audio[data-kvoice='1']").forEach(a=>{
-      if(a!==audio && !a.paused) a.pause();
-    });
-  }
 
-  function build(audio){
-    if(!audio || systemIds.has(audio.id) || audio.dataset.kvoice==="1")return;
-    audio.dataset.kvoice="1";
-    audio.classList.add("voiceNativeHidden");
-    audio.controls=false;
+/* v6.6: one persistent Audio object per rendered voice message */
+let kolyaActiveVoice=null;
 
-    const box=document.createElement("div"); box.className="voicePlayer";
-    const play=document.createElement("button"); play.type="button"; play.className="voicePlay"; play.textContent="▶";
-    const seek=document.createElement("input"); seek.type="range"; seek.className="voiceSeek"; seek.min="0"; seek.max="1000"; seek.value="0"; seek.step="1";
-    const clock=document.createElement("span"); clock.className="voiceClock"; clock.textContent="00:00 / 00:00";
-    const speed=document.createElement("button"); speed.type="button"; speed.className="voiceSpeed"; speed.textContent="1×";
+function kfmtVoice(sec){
+  if(!Number.isFinite(sec)||sec<0)return "--:--";
+  sec=Math.floor(sec);
+  return String(Math.floor(sec/60)).padStart(2,"0")+":"+String(sec%60).padStart(2,"0");
+}
+function initVoicePlayers(){
+  document.querySelectorAll(".voiceV66[data-voice-url]").forEach(box=>{
+    if(box.dataset.ready==="1")return;
+    box.dataset.ready="1";
+    const play=box.querySelector(".voicePlayV66");
+    const seek=box.querySelector(".voiceSeekV66");
+    const clock=box.querySelector(".voiceClockV66");
+    const speed=box.querySelector(".voiceSpeedV66");
+    const audio=new Audio(box.dataset.voiceUrl);
+    audio.preload="metadata";
+    box._audio=audio;
+    let dragging=false, speeds=[1,2,3], speedIndex=0;
 
-    box.append(play,seek,clock,speed);
-    audio.insertAdjacentElement("afterend",box);
-
-    let speeds=[1,2,3],si=0,seeking=false;
-
-    function update(){
-      const d=audio.duration;
-      const c=audio.currentTime||0;
-      if(!seeking && Number.isFinite(d) && d>0) seek.value=Math.round((c/d)*1000);
-      clock.textContent=fmt(c)+" / "+fmt(d);
+    const refresh=()=>{
+      const d=audio.duration,c=audio.currentTime||0;
+      if(!dragging && Number.isFinite(d)&&d>0)seek.value=Math.round(c/d*1000);
+      clock.textContent=kfmtVoice(c)+" / "+kfmtVoice(d);
       play.textContent=audio.paused?"▶":"❚❚";
-    }
-    audio.addEventListener("loadedmetadata",update);
-    audio.addEventListener("durationchange",update);
-    audio.addEventListener("timeupdate",update);
-    audio.addEventListener("play",()=>{pauseOthers(audio);activeAudio=audio;update();});
-    audio.addEventListener("pause",update);
-    audio.addEventListener("ended",()=>{audio.currentTime=0;update();});
+    };
+    audio.addEventListener("loadedmetadata",refresh);
+    audio.addEventListener("durationchange",refresh);
+    audio.addEventListener("timeupdate",refresh);
+    audio.addEventListener("pause",refresh);
+    audio.addEventListener("play",()=>{
+      if(kolyaActiveVoice && kolyaActiveVoice!==audio)kolyaActiveVoice.pause();
+      kolyaActiveVoice=audio; refresh();
+    });
+    audio.addEventListener("ended",()=>{audio.currentTime=0;refresh();});
 
     play.addEventListener("click",e=>{
       e.preventDefault();e.stopPropagation();
-      if(audio.paused){ pauseOthers(audio); audio.play().catch(()=>{}); }
+      if(audio.paused)audio.play().catch(()=>{});
       else audio.pause();
     });
-
     seek.addEventListener("input",()=>{
-      seeking=true;
+      dragging=true;
       const d=audio.duration;
-      if(Number.isFinite(d)&&d>0){
-        const preview=(Number(seek.value)/1000)*d;
-        clock.textContent=fmt(preview)+" / "+fmt(d);
-      }
+      if(Number.isFinite(d)&&d>0)clock.textContent=kfmtVoice(Number(seek.value)/1000*d)+" / "+kfmtVoice(d);
     });
     seek.addEventListener("change",()=>{
       const d=audio.duration;
-      if(Number.isFinite(d)&&d>0)audio.currentTime=(Number(seek.value)/1000)*d;
-      seeking=false;update();
+      if(Number.isFinite(d)&&d>0)audio.currentTime=Number(seek.value)/1000*d;
+      dragging=false;refresh();
     });
-
     speed.addEventListener("click",e=>{
       e.preventDefault();e.stopPropagation();
-      si=(si+1)%speeds.length;
-      audio.playbackRate=speeds[si];
-      speed.textContent=speeds[si]+"×";
+      speedIndex=(speedIndex+1)%speeds.length;
+      audio.playbackRate=speeds[speedIndex];
+      speed.textContent=speeds[speedIndex]+"×";
     });
-
-    if(audio.readyState>=1)update();
-  }
-
-  function scan(root=document){
-    root.querySelectorAll?.("audio").forEach(build);
-  }
-  scan();
-  new MutationObserver(ms=>ms.forEach(m=>m.addedNodes.forEach(n=>{
-    if(n.nodeType!==1)return;
-    if(n.tagName==="AUDIO")build(n);
-    scan(n);
-  }))).observe(document.body,{childList:true,subtree:true});
-})();
+    refresh();
+  });
+}
+new MutationObserver(()=>initVoicePlayers()).observe(document.getElementById("messages")||document.body,{childList:true,subtree:true});
+initVoicePlayers();
 
 </script>
 </body>
