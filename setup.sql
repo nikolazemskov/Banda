@@ -85,3 +85,36 @@ update public.invite_codes set active=false;
 insert into public.invite_codes(code,active)
 values ('ЕГИПЕТ2026',true)
 on conflict(code) do update set active=true;
+
+
+-- КОЛЯГРАМ v7.4: доставка / прочтение / realtime
+alter table public.messages add column if not exists delivered_at timestamptz;
+alter table public.messages add column if not exists read_at timestamptz;
+
+drop policy if exists "messages update status" on public.messages;
+create policy "messages update status"
+on public.messages
+for update
+to authenticated
+using (
+  recipient_id is null
+  or recipient_id = auth.uid()
+  or sender_id = auth.uid()
+)
+with check (
+  recipient_id is null
+  or recipient_id = auth.uid()
+  or sender_id = auth.uid()
+);
+
+do $$
+begin
+  alter publication supabase_realtime add table public.messages;
+exception when duplicate_object then null;
+end $$;
+
+do $$
+begin
+  alter publication supabase_realtime add table public.profiles;
+exception when duplicate_object then null;
+end $$;

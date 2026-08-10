@@ -1,4 +1,4 @@
-const CACHE="kolyagram-v7-3";
+const CACHE="kolyagram-v7-4";
 const STATIC=[
   "./manifest.webmanifest",
   "./icon-180.png",

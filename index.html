@@ -256,6 +256,14 @@ body.isRecording #recordingBar,body.isRecording #recordingBar *{visibility:visib
 .profileNameRow input{min-width:0;margin:0}
 .profileSaveBtn{min-height:48px!important;padding:0 14px!important;border-radius:16px!important}
 
+
+.serverAvatar{object-fit:cover!important;padding:0!important}
+.deliveryState{display:inline-flex;align-items:center;gap:2px;margin-left:4px;font-weight:900}
+.deliveryState.sent{color:#9aa6aa}
+.deliveryState.delivered{color:#58aaa8}
+.deliveryState.read{color:#14b8b8}
+.unreadBadge{min-width:20px;height:20px;padding:0 6px;border-radius:999px;background:#18b7b9;color:#fff;font-size:11px;font-weight:900;display:grid;place-items:center}
+
 </style>
 </head>
 <body>
@@ -334,7 +342,7 @@ body.isRecording #recordingBar,body.isRecording #recordingBar *{visibility:visib
 <input id="avatarPhotoInput" type="file" accept="image/*" style="display:none">
 <label for="avatarPhotoInput" class="avatarPick" style="display:block;text-align:center;margin:12px 0 10px">Выбрать фото для аватарки</label>
 <button id="removeAvatarPhoto" class="secondary" style="width:100%;display:none;margin-bottom:10px">Удалить фото</button>
-<button id="copyInvite" class="secondary" style="width:100%">Показать код приглашения</button><div class="versionTag">КОЛЯГРАМ v7.3</div>
+<button id="copyInvite" class="secondary" style="width:100%">Показать код приглашения</button><div class="versionTag">КОЛЯГРАМ v7.4</div>
       </div>
     </div>
   </section>
@@ -515,6 +523,7 @@ $("#join").addEventListener("click",async()=>{
     me=null;
     return;
   }
+  await requestKolyagramNotifications();
   await enterHome();
 });
 $("#logout").addEventListener("click",()=>{localStorage.removeItem("kolyagram.me");me=null;show("login")});
@@ -534,7 +543,7 @@ async function loadPeople(){
   }
   $("#people").innerHTML=users.map(u=>`
     <button class="chatRow" data-person="${esc(u.id)}" data-name="${esc(u.name)}" data-avatar="${esc(u.avatar)}" data-avatar-url="${esc(u.avatar_url||"")}" style="margin-top:8px;width:100%">
-      <div class="avatar">${esc(u.avatar)}</div>
+      ${u.avatar_url?`<img class="avatar serverAvatar" src="${esc(u.avatar_url)}" alt="">`:`<div class="avatar">${esc(u.avatar)}</div>`}
       <div class="body"><b>${esc(u.name)}</b><small>Личный чат</small></div>
       <span class="onlineDot"></span>
     </button>`).join("");
@@ -545,6 +554,7 @@ async function enterHome(){
   if($("#mode"))$("#mode").textContent=READY?"онлайн":"";
   $("#profileName").textContent=me.name;$("#profileAvatarFallback").textContent=me.avatar;if($("#profileNameInput"))$("#profileNameInput").value=me.name;
   await loadPeople();
+  await startRealtime();
 }
 $("#tabChats").addEventListener("click",()=>{$("#tabChats").classList.add("active");$("#tabProfile").classList.remove("active");$("#chatsPanel").style.display="block";$("#profilePanel").style.display="none"});
 $("#tabProfile").addEventListener("click",()=>{$("#tabProfile").classList.add("active");$("#tabChats").classList.remove("active");$("#chatsPanel").style.display="none";$("#profilePanel").style.display="block"});
@@ -595,8 +605,8 @@ function msgHTML(m){
   let content="";
   if(m.kind==="photo"&&m.media_url)content=`<div class="bubble ${mine?"mine":"other"} photoBubble"><img src="${esc(m.media_url)}" alt="Фото"><div class="meta">${fmtTime(m.created_at)}</div></div>`;
   else if(m.kind==="voice"&&m.media_url)content=`<div class="bubble ${mine?"mine":"other"}"><div class="voice voiceV66" data-voice-url="${esc(m.media_url)}"><button class="play voicePlayV66" type="button">▶</button><div class="voiceBodyV66"><input class="voiceSeekV66" type="range" min="0" max="1000" value="0" step="1"><div class="voiceInfoV66"><span class="voiceClockV66">00:00 / --:--</span><button class="voiceSpeedV66" type="button">1×</button></div></div></div><div class="meta">${fmtTime(m.created_at)}</div></div>`;
-  else if(m.kind==="sticker"&&m.media_url)content=`<div class="stickerMsg"><img src="${esc(m.media_url)}" alt="Эмодзи БАНДЫ"><div class="stickerMeta">${fmtTime(m.created_at)}${mine?" ✓✓":""}</div></div>`;
-  else content=`<div class="bubble ${mine?"mine":"other"}">${mine?"":`<div class="sender">${esc(m.sender_profile_name||m.sender_name)}</div>`}<div class="msgtext">${esc(m.text)}</div><div class="meta">${fmtTime(m.created_at)}${mine?" ✓✓":""}</div></div>`;
+  else if(m.kind==="sticker"&&m.media_url)content=`<div class="stickerMsg"><img src="${esc(m.media_url)}" alt="Эмодзи БАНДЫ"><div class="stickerMeta">${fmtTime(m.created_at)}${deliveryHTML(m,mine)}</div></div>`;
+  else content=`<div class="bubble ${mine?"mine":"other"}">${mine?"":`<div class="sender">${esc(m.sender_profile_name||m.sender_name)}</div>`}<div class="msgtext">${esc(m.text)}</div><div class="meta">${fmtTime(m.created_at)}${deliveryHTML(m,mine)}</div></div>`;
   return `<div class="msgrow ${mine?"mine":""}">${mine?"":(m.sender_avatar_url?`<img class="avatar serverAvatar" src="${esc(m.sender_avatar_url)}" alt="">`:`<div class="avatar">${esc(avatar)}</div>`)}${content}</div>`;
 }
 async function loadMessages(){
@@ -681,14 +691,7 @@ $("#mic").addEventListener("click",async()=>{
 });
 
 if(READY){
-  supabase.channel("kolyagram-live")
-    .on("postgres_changes",{event:"INSERT",schema:"public",table:"messages"},async payload=>{
-      const myid=await currentAuthId();
-      if(payload.new?.sender_id && payload.new.sender_id!==myid) kolyaPlay("messageSound");
-      if($("#chat").classList.contains("active")) await loadMessages();
-    })
-    .on("postgres_changes",{event:"*",schema:"public",table:"profiles"},()=>loadPeople())
-    .subscribe();
+  
 }
 
 const КОЛЯГРАМ_EMOJIS = ["./egypt_01.png", "./egypt_02.png", "./egypt_03.png", "./egypt_04.png", "./egypt_05.png", "./egypt_06.png", "./egypt_07.png", "./egypt_08.png", "./egypt_09.png", "./egypt_10.png", "./egypt_11.png", "./egypt_12.png", "./egypt_13.png", "./egypt_14.png", "./egypt_15.png", "./egypt_16.png", "./egypt_17.png", "./egypt_18.png"];
@@ -716,7 +719,7 @@ document.addEventListener("touchend", e=>{
   lastTouchEnd=now;
 },{passive:false});
 
-if("serviceWorker" in navigator)navigator.serviceWorker.register("./sw.js?v=7.3");
+if("serviceWorker" in navigator)navigator.serviceWorker.register("./sw.js?v=7.4");
 if(me)enterHome();
 
 
@@ -936,6 +939,101 @@ document.getElementById("saveProfileName")?.addEventListener("click", async()=>{
   await loadPeople();
   if(document.getElementById("chat")?.classList.contains("active"))await loadMessages();
 });
+
+
+function deliveryHTML(m,mine){
+  if(!mine)return "";
+  if(m.read_at)return `<span class="deliveryState read" title="Прочитано">✓✓</span>`;
+  if(m.delivered_at)return `<span class="deliveryState delivered" title="Доставлено">✓✓</span>`;
+  return `<span class="deliveryState sent" title="Отправлено">✓</span>`;
+}
+
+async function markVisibleMessages(){
+  if(!READY || !me)return;
+  const myid=await currentAuthId();
+  if(!myid)return;
+  const now=new Date().toISOString();
+
+  // Все видимые входящие считаем доставленными.
+  let q=supabase.from("messages")
+    .update({delivered_at:now})
+    .neq("sender_id",myid)
+    .is("delivered_at",null);
+
+  if(currentChat.type==="group") q=q.is("recipient_id",null);
+  else q=q.eq("sender_id",currentChat.id).eq("recipient_id",myid);
+  await q;
+
+  // Если сам чат открыт, входящие считаем прочитанными.
+  if(document.getElementById("chat")?.classList.contains("active")){
+    let r=supabase.from("messages")
+      .update({read_at:now,delivered_at:now})
+      .neq("sender_id",myid)
+      .is("read_at",null);
+
+    if(currentChat.type==="group") r=r.is("recipient_id",null);
+    else r=r.eq("sender_id",currentChat.id).eq("recipient_id",myid);
+    await r;
+  }
+}
+
+function playIncomingSound(){
+  const a=document.getElementById("messageSound");
+  if(!a)return;
+  try{a.currentTime=0; const p=a.play(); if(p?.catch)p.catch(()=>{});}catch(e){}
+}
+
+async function requestKolyagramNotifications(){
+  if(!("Notification" in window))return;
+  if(Notification.permission==="default"){
+    try{await Notification.requestPermission();}catch(e){}
+  }
+}
+function showIncomingNotification(m){
+  if(!("Notification" in window) || Notification.permission!=="granted")return;
+  if(document.visibilityState==="visible")return;
+  try{
+    new Notification(m.sender_name||"КОЛЯГРАМ",{
+      body:m.kind==="text"?(m.text||"Новое сообщение"):(m.kind==="voice"?"Голосовое сообщение":m.kind==="photo"?"Фото":"Новое сообщение"),
+      icon:"./icon-180.png",
+      badge:"./icon-180.png",
+      tag:"kolyagram-message-"+m.id
+    });
+  }catch(e){}
+}
+
+
+let kolyaRealtimeChannel=null;
+async function startRealtime(){
+  if(!READY || kolyaRealtimeChannel)return;
+  const myid=await currentAuthId();
+  if(!myid)return;
+
+  kolyaRealtimeChannel=supabase.channel("kolyagram-v74-live")
+    .on("postgres_changes",{event:"INSERT",schema:"public",table:"messages"},async payload=>{
+      const m=payload.new;
+      if(m.sender_id!==myid){
+        playIncomingSound();
+        showIncomingNotification(m);
+      }
+      if(document.getElementById("chat")?.classList.contains("active")){
+        const relevant=currentChat.type==="group"
+          ? m.recipient_id===null
+          : ((m.sender_id===myid && m.recipient_id===currentChat.id) ||
+             (m.sender_id===currentChat.id && m.recipient_id===myid));
+        if(relevant) await loadMessages();
+      }
+      await loadPeople();
+    })
+    .on("postgres_changes",{event:"UPDATE",schema:"public",table:"messages"},async payload=>{
+      if(document.getElementById("chat")?.classList.contains("active")) await loadMessages();
+    })
+    .on("postgres_changes",{event:"*",schema:"public",table:"profiles"},async()=>{
+      await loadPeople();
+      if(document.getElementById("chat")?.classList.contains("active")) await loadMessages();
+    })
+    .subscribe();
+}
 
 </script>
 </body>
