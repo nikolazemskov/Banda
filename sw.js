@@ -1,4 +1,4 @@
-const CACHE="kolyagram-v10-2-infinite-speed-safe-gap";
+const CACHE="kolyagram-v10-3-safe-infinite";
 const STATIC=[
   "./manifest.webmanifest",
   "./icon-180.png",
