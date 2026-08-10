@@ -1,6 +1,6 @@
 {
-  "name": "БАНДА",
-  "short_name": "БАНДА",
+  "name": "КОЛЯГРАМ",
+  "short_name": "КОЛЯГРАМ",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
@@ -17,5 +17,11 @@
       "sizes": "512x512",
       "type": "image/png"
     }
-  ]
+  ],
+  "display_override": [
+    "standalone",
+    "fullscreen"
+  ],
+  "id": "./",
+  "description": "Мессенджер для своих"
 }

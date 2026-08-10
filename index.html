@@ -2,14 +2,18 @@
 <html lang="ru">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
   <meta name="theme-color" content="#FAFAF7">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <meta name="apple-mobile-web-app-title" content="БАНДА">
+  <meta name="apple-mobile-web-app-title" content="КОЛЯГРАМ">
+
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="format-detection" content="telephone=no">
+
   <link rel="manifest" href="./manifest.webmanifest">
   <link rel="apple-touch-icon" href="./icon-180.png">
-  <title>БАНДА</title>
+  <title>КОЛЯГРАМ</title>
   <style>
     :root{
       --bg:#FAFAF7;
@@ -125,6 +129,37 @@
     .stickerMsg img{display:block;width:120px;height:120px;object-fit:contain}
     .stickerMeta{font-size:10px;color:var(--muted);text-align:right;margin-top:2px}
 
+
+    .bottomBack{
+      position:fixed;
+      left:12px;
+      bottom:calc(env(safe-area-inset-bottom) + 82px);
+      z-index:35;
+      width:48px;
+      height:48px;
+      border:1px solid var(--line);
+      background:rgba(255,255,255,.96);
+      backdrop-filter:blur(18px);
+      border-radius:18px;
+      display:grid;
+      place-items:center;
+      box-shadow:var(--shadow);
+      color:var(--text);
+    }
+    .versionTag{
+      margin-top:14px;
+      text-align:center;
+      font-size:10px;
+      color:var(--muted);
+      letter-spacing:.12em;
+      text-transform:uppercase;
+    }
+    html,body{
+      overscroll-behavior:none;
+      touch-action:manipulation;
+      -webkit-text-size-adjust:100%;
+    }
+
     .profileCard{background:white;border:1px solid var(--line);border-radius:22px;padding:16px}
     .profileHero{display:flex;align-items:center;gap:12px}
     .profileHero .avatar{width:58px;height:58px;border-radius:20px;font-size:21px}
@@ -140,11 +175,11 @@
         <path d="M24 30h16M24 36h10"/>
       </svg>
     </div>
-    <h1 class="brand">БАНДА</h1>
+    <h1 class="brand">КОЛЯГРАМ</h1>
     <p>Закрытый мессенджер для своих. Крупно, чисто и без лишней хуйни.</p>
 
     <label for="code">Код приглашения</label>
-    <input id="code" placeholder="BANDA2026" autocomplete="one-time-code">
+    <input id="code" placeholder="КОЛЯГРАМ2026" autocomplete="one-time-code">
 
     <label for="name">Имя</label>
     <input id="name" placeholder="Колян" autocomplete="nickname">
@@ -153,7 +188,7 @@
     <input id="avatarInput" maxlength="4" value="К">
 
     <button id="join" class="primary">Войти</button>
-    <div class="hint">Демо-код: <b>BANDA2026</b>. Для переписки между разными телефонами подключается бесплатный Supabase.</div>
+    <div class="hint">Демо-код: <b>КОЛЯГРАМ2026</b>. Для переписки между разными телефонами подключается бесплатный Supabase.</div>
   </section>
 
   <section id="home" class="screen">
@@ -161,7 +196,7 @@
       <div class="toprow">
         <div class="groupAvatar">Б</div>
         <div class="titleWrap">
-          <div class="brand" style="font-size:20px">БАНДА</div>
+          <div class="brand" style="font-size:20px">КОЛЯГРАМ</div>
           <div id="mode" class="titleSub">локальное демо</div>
         </div>
         <button id="logout" class="circleBtn" aria-label="Выйти">↪</button>
@@ -191,7 +226,7 @@
           <div><b id="profileName">Колян</b><div class="muted" style="margin-top:4px;font-size:13px">участник Банды</div></div>
         </div>
         <div style="height:12px"></div>
-        <button id="copyInvite" class="secondary" style="width:100%">Показать код приглашения</button>
+        <button id="copyInvite" class="secondary" style="width:100%">Показать код приглашения</button><div class="versionTag">КОЛЯГРАМ v5.0</div>
       </div>
     </div>
   </section>
@@ -199,9 +234,6 @@
   <section id="chat" class="screen">
     <header class="topbar">
       <div class="toprow">
-        <button id="back" class="circleBtn" aria-label="Назад">
-          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M15 18l-6-6 6-6"/></svg>
-        </button>
         <div id="chatAvatar" class="groupAvatar">Б</div>
         <div class="titleWrap">
           <div id="chatTitle" class="titleMain">Общий чат</div>
@@ -239,6 +271,13 @@
         <input id="fileInput" type="file" accept="image/*" hidden>
       </div>
     </div>
+
+
+    <button id="back" class="bottomBack" aria-label="Назад">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M15 18l-6-6 6-6"/>
+      </svg>
+    </button>
 
     <div id="emojiPanel" class="emojiPanel">
       <div class="emojiPanelHead">
@@ -284,7 +323,7 @@ async function currentAuthId(){
   return user?.id||null;
 }
 async function validCode(code){
-  if(!READY)return code.trim().toUpperCase()==="BANDA2026";
+  if(!READY)return code.trim().toUpperCase()==="КОЛЯГРАМ2026";
   const {data,error}=await supabase.from("invite_codes").select("code").eq("code",code.trim()).eq("active",true).maybeSingle();
   return !error&&!!data;
 }
@@ -462,9 +501,9 @@ if(READY){
   supabase.channel("banda-live").on("postgres_changes",{event:"INSERT",schema:"public",table:"messages"},()=>{if($("#chat").classList.contains("active"))loadMessages()}).subscribe();
 }
 
-const BANDA_EMOJIS = ["./egypt_01.png", "./egypt_02.png", "./egypt_03.png", "./egypt_04.png", "./egypt_05.png", "./egypt_06.png", "./egypt_07.png", "./egypt_08.png", "./egypt_09.png", "./egypt_10.png", "./egypt_11.png", "./egypt_12.png", "./egypt_13.png", "./egypt_14.png", "./egypt_15.png", "./egypt_16.png", "./egypt_17.png", "./egypt_18.png"];
+const КОЛЯГРАМ_EMOJIS = ["./egypt_01.png", "./egypt_02.png", "./egypt_03.png", "./egypt_04.png", "./egypt_05.png", "./egypt_06.png", "./egypt_07.png", "./egypt_08.png", "./egypt_09.png", "./egypt_10.png", "./egypt_11.png", "./egypt_12.png", "./egypt_13.png", "./egypt_14.png", "./egypt_15.png", "./egypt_16.png", "./egypt_17.png", "./egypt_18.png"];
 function renderBandaEmojis(){
-  $("#emojiGrid").innerHTML=BANDA_EMOJIS.map(src=>`<button class="emojiPick" data-sticker="${src}"><img src="${src}" alt="Эмодзи"></button>`).join("");
+  $("#emojiGrid").innerHTML=КОЛЯГРАМ_EMOJIS.map(src=>`<button class="emojiPick" data-sticker="${src}"><img src="${src}" alt="Эмодзи"></button>`).join("");
   document.querySelectorAll("[data-sticker]").forEach(b=>b.addEventListener("click",async()=>{
     $("#emojiPanel").classList.remove("show");
     await insertMessage(await baseMessage("sticker","",b.dataset.sticker));
@@ -476,7 +515,18 @@ $("#emojiToggle").addEventListener("click",()=>{
 });
 $("#emojiClose").addEventListener("click",()=>$("#emojiPanel").classList.remove("show"));
 
-if("serviceWorker" in navigator)navigator.serviceWorker.register("./sw.js");
+
+document.addEventListener("gesturestart", e => e.preventDefault(), {passive:false});
+document.addEventListener("gesturechange", e => e.preventDefault(), {passive:false});
+document.addEventListener("gestureend", e => e.preventDefault(), {passive:false});
+let lastTouchEnd=0;
+document.addEventListener("touchend", e=>{
+  const now=Date.now();
+  if(now-lastTouchEnd<=300)e.preventDefault();
+  lastTouchEnd=now;
+},{passive:false});
+
+if("serviceWorker" in navigator)navigator.serviceWorker.register("./sw.js?v=5");
 if(me)enterHome();
 </script>
 </body>
