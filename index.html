@@ -185,10 +185,7 @@
 </style>
 </head>
 <body>
-<div style="padding:calc(env(safe-area-inset-top) + 10px) 16px 6px"><div class="brandLockup">
-  <img class="brandLogo" src="./kolyagram-logo.jpg" alt="">
-  <div><div class="brandName">КОЛЯГРАМ</div><div class="brandSub">мессенджер для своих</div></div>
-</div></div>
+<div style="padding:calc(env(safe-area-inset-top) + 10px) 16px 6px"><div class="brandLockup"><img class="brandLogo" src="./kolyagram-logo.jpg" alt="КОЛЯГРАМ"></div></div>
 <div class="app">
   <section id="login" class="screen login active">
     <div class="mark">
@@ -248,7 +245,7 @@
           <div><b id="profileName">Колян</b><div class="muted" style="margin-top:4px;font-size:13px">участник Банды</div></div>
         </div>
         <div style="height:12px"></div>
-        <button id="copyInvite" class="secondary" style="width:100%">Показать код приглашения</button><div class="versionTag">КОЛЯГРАМ v6.0</div>
+        <button id="copyInvite" class="secondary" style="width:100%">Показать код приглашения</button><div class="versionTag">КОЛЯГРАМ v6.1</div>
       </div>
     </div>
   </section>
@@ -548,7 +545,7 @@ document.addEventListener("touchend", e=>{
   lastTouchEnd=now;
 },{passive:false});
 
-if("serviceWorker" in navigator)navigator.serviceWorker.register("./sw.js?v=6");
+if("serviceWorker" in navigator)navigator.serviceWorker.register("./sw.js?v=6.1");
 if(me)enterHome();
 
 (function(){
