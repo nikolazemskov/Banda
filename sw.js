@@ -1,4 +1,4 @@
-const CACHE="kolyagram-v8-7-kolyajump-heroes";
+const CACHE="kolyagram-v8-9-dota-original";
 const STATIC=[
   "./manifest.webmanifest",
   "./icon-180.png",
