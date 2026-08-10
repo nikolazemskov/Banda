@@ -320,6 +320,19 @@ html,body{overscroll-behavior:none}
 .msgrow{overflow-anchor:none}
 
 </style>
+
+<style id="kj-chat-rank-style">
+.kjGameCard{margin:8px 0;padding:14px;border:1px solid rgba(212,174,83,.55);border-radius:14px;background:radial-gradient(circle at 20% 0,rgba(170,117,35,.25),transparent 38%),linear-gradient(145deg,#202225,#0c0e10);box-shadow:0 10px 28px rgba(0,0,0,.28);color:#f5ead0;overflow:hidden}
+.kjGameCardTitle{font-weight:1000;letter-spacing:1px;color:#e9c66d;font-size:12px}
+.kjGameCardBody{display:flex;align-items:center;gap:12px;margin-top:8px}
+.kjGameMedalWrap{width:72px;height:72px;position:relative;display:grid;place-items:center;flex:0 0 72px}
+.kjGameMedalWrap:before{content:"";position:absolute;inset:2px;border-radius:50%;background:conic-gradient(transparent,#f2c25c,#fff1a6,#a65c10,transparent);filter:blur(8px);animation:kjChatSpin 2.6s linear infinite}
+.kjGameMedal{max-width:68px;max-height:68px;position:relative;z-index:1;filter:drop-shadow(0 4px 5px #000)}
+.kjGameRank{font-family:Georgia,serif;font-size:18px;font-weight:900}
+.kjGameScore{font-size:14px;font-weight:900;margin-top:3px}
+.kjGamePlace{font-size:12px;opacity:.72;margin-top:3px}
+@keyframes kjChatSpin{to{transform:rotate(360deg)}}
+</style>
 </head>
 <body>
 <div class="app">
@@ -1514,6 +1527,29 @@ function unlockAllKolyagramAudio(){
 document.addEventListener("pointerdown",unlockAllKolyagramAudio,{once:true});
 document.addEventListener("touchend",unlockAllKolyagramAudio,{once:true});
 
+</script>
+
+<script id="kj-chat-rank-bridge">
+function kjMakeChatCard(ev){
+ const d=ev.detail||ev.data||ev;
+ if(!d||!d.chat_card||!d.rank)return null;
+ const box=document.createElement('div');
+ box.className='kjGameCard';
+ box.innerHTML=`<div class="kjGameCardTitle">${d.type==='rank_up'?'🏆 НОВОЕ ЗВАНИЕ • КОЛЯДЖАМП':'🔥 НОВЫЙ РЕКОРД • КОЛЯДЖАМП'}</div>
+ <div class="kjGameCardBody"><div class="kjGameMedalWrap"><img class="kjGameMedal" src="${d.rank.medal||''}"></div>
+ <div><div class="kjGameRank">${d.rank.label}</div><div class="kjGameScore">${Number(d.score||0).toLocaleString('ru-RU')} очков</div><div class="kjGamePlace">Место в рейтинге: #${d.place||1}</div></div></div>`;
+ return box;
+}
+window.addEventListener('message',e=>{
+ const d=e.data;
+ if(!d||d.source!=='kolyajump'||!d.chat_card)return;
+ const card=kjMakeChatCard(d);
+ // Try common chat containers. If app has its own send API, preserve event for integration.
+ const host=document.querySelector('#messages,.messages,.chat-messages,[data-messages]');
+ if(host&&card){host.appendChild(card);host.scrollTop=host.scrollHeight}
+ localStorage.setItem('kolyajump_pending_chat_card',JSON.stringify(d));
+ window.dispatchEvent(new CustomEvent('kolyagram:game-card',{detail:d}));
+});
 </script>
 </body>
 </html>
