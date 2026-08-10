@@ -265,7 +265,7 @@ body.isRecording #recordingBar,body.isRecording #recordingBar *{visibility:visib
     <p>Закрытый мессенджер для своих. Крупно, чисто и без лишней хуйни.</p>
 
     <label for="code">Код приглашения</label>
-    <input id="code" placeholder="КОЛЯГРАМ2026" autocomplete="one-time-code">
+    <input id="code" placeholder="KOLYA2026" autocomplete="one-time-code">
 
     <label for="name">Имя</label>
     <input id="name" placeholder="Колян" autocomplete="nickname">
@@ -276,7 +276,7 @@ body.isRecording #recordingBar,body.isRecording #recordingBar *{visibility:visib
     <button id="join" class="primary">Войти</button>
 <div id="serverError" style="display:none;margin:10px 0 0;padding:12px 14px;border-radius:16px;background:#fff0f0;border:1px solid #ffcaca;color:#9f2020;font-size:13px;line-height:1.4;word-break:break-word"></div>
 
-    <div class="hint">Демо-код: <b>КОЛЯГРАМ2026</b>. Для переписки между разными телефонами подключается бесплатный Supabase.</div>
+    <div class="hint">Код приглашения для своих: <b>KOLYA2026</b></div>
   </section>
 
   <section id="home" class="screen">
@@ -319,7 +319,7 @@ body.isRecording #recordingBar,body.isRecording #recordingBar *{visibility:visib
         <input id="avatarPhotoInput" type="file" accept="image/*" style="display:none">
 <label for="avatarPhotoInput" class="avatarPick" style="display:block;text-align:center;margin:12px 0 10px">Выбрать фото для аватарки</label>
 <button id="removeAvatarPhoto" class="secondary" style="width:100%;display:none;margin-bottom:10px">Удалить фото</button>
-<button id="copyInvite" class="secondary" style="width:100%">Показать код приглашения</button><div class="versionTag">КОЛЯГРАМ v7.1</div>
+<button id="copyInvite" class="secondary" style="width:100%">Показать код приглашения</button><div class="versionTag">КОЛЯГРАМ v7.2</div>
       </div>
     </div>
   </section>
@@ -698,7 +698,7 @@ document.addEventListener("touchend", e=>{
   lastTouchEnd=now;
 },{passive:false});
 
-if("serviceWorker" in navigator)navigator.serviceWorker.register("./sw.js?v=7.1");
+if("serviceWorker" in navigator)navigator.serviceWorker.register("./sw.js?v=7.2");
 if(me)enterHome();
 
 
