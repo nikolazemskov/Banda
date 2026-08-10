@@ -6,9 +6,7 @@ create table if not exists public.invite_codes(
   active boolean not null default true
 );
 
-insert into public.invite_codes(code,active)
-values ('KOLYA2026',true)
-on conflict(code) do update set active=true;
+
 
 create table if not exists public.profiles(
   id uuid primary key references auth.users(id) on delete cascade,
@@ -80,3 +78,10 @@ begin
   alter publication supabase_realtime add table public.profiles;
 exception when duplicate_object then null;
 end $$;
+
+
+-- Код входа КОЛЯГРАМ v7.3
+update public.invite_codes set active=false;
+insert into public.invite_codes(code,active)
+values ('ЕГИПЕТ2026',true)
+on conflict(code) do update set active=true;
