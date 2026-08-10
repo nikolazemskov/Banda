@@ -164,9 +164,31 @@
     .profileHero{display:flex;align-items:center;gap:12px}
     .profileHero .avatar{width:58px;height:58px;border-radius:20px;font-size:21px}
     .muted{color:var(--muted)}
-  </style>
+  
+    .brandLockup{display:flex;align-items:center;gap:10px;min-width:0}
+    .brandLogo{width:42px;height:42px;border-radius:13px;object-fit:cover;box-shadow:0 5px 16px rgba(25,190,190,.16);flex:0 0 auto}
+    .brandName{
+      font-weight:900;font-size:20px;line-height:1;letter-spacing:.045em;
+      background:linear-gradient(135deg,#16bfc2 0%,#5de0df 45%,#202b31 100%);
+      -webkit-background-clip:text;background-clip:text;color:transparent;
+      text-shadow:0 1px 0 rgba(255,255,255,.55);
+    }
+    .brandSub{font-size:10px;color:#47bfc0;margin-top:4px;letter-spacing:.04em}
+    .profileAvatarWrap{display:flex;flex-direction:column;align-items:center;gap:10px;margin:4px 0 16px}
+    .profileAvatar{
+      width:92px;height:92px;border-radius:28px;object-fit:cover;background:#eefafa;
+      border:1px solid rgba(30,190,190,.24);box-shadow:0 10px 28px rgba(25,160,160,.12)
+    }
+    .avatarPick{font-size:13px;font-weight:800;color:#179fa2;background:#effafa;border:1px solid #cdeeee;border-radius:14px;padding:9px 13px}
+    #avatarInput{display:none}
+
+</style>
 </head>
 <body>
+<div style="padding:calc(env(safe-area-inset-top) + 10px) 16px 6px"><div class="brandLockup">
+  <img class="brandLogo" src="./kolyagram-logo.jpg" alt="">
+  <div><div class="brandName">КОЛЯГРАМ</div><div class="brandSub">мессенджер для своих</div></div>
+</div></div>
 <div class="app">
   <section id="login" class="screen login active">
     <div class="mark">
@@ -226,7 +248,7 @@
           <div><b id="profileName">Колян</b><div class="muted" style="margin-top:4px;font-size:13px">участник Банды</div></div>
         </div>
         <div style="height:12px"></div>
-        <button id="copyInvite" class="secondary" style="width:100%">Показать код приглашения</button><div class="versionTag">КОЛЯГРАМ v5.0</div>
+        <button id="copyInvite" class="secondary" style="width:100%">Показать код приглашения</button><div class="versionTag">КОЛЯГРАМ v6.0</div>
       </div>
     </div>
   </section>
@@ -526,8 +548,39 @@ document.addEventListener("touchend", e=>{
   lastTouchEnd=now;
 },{passive:false});
 
-if("serviceWorker" in navigator)navigator.serviceWorker.register("./sw.js?v=5");
+if("serviceWorker" in navigator)navigator.serviceWorker.register("./sw.js?v=6");
 if(me)enterHome();
+
+(function(){
+  const input=document.getElementById("avatarInput");
+  const img=document.getElementById("profileAvatar");
+  if(!input||!img)return;
+  const saved=localStorage.getItem("kolyagram_avatar");
+  if(saved)img.src=saved;
+  input.addEventListener("change",()=>{
+    const file=input.files&&input.files[0];
+    if(!file)return;
+    const reader=new FileReader();
+    reader.onload=()=>{
+      const temp=new Image();
+      temp.onload=()=>{
+        const size=320, c=document.createElement("canvas");
+        c.width=size;c.height=size;
+        const ctx=c.getContext("2d");
+        const scale=Math.max(size/temp.width,size/temp.height);
+        const w=temp.width*scale,h=temp.height*scale;
+        ctx.drawImage(temp,(size-w)/2,(size-h)/2,w,h);
+        const data=c.toDataURL("image/jpeg",.84);
+        localStorage.setItem("kolyagram_avatar",data);
+        img.src=data;
+        document.querySelectorAll("[data-my-avatar]").forEach(x=>x.src=data);
+      };
+      temp.src=reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
+})();
+
 </script>
 </body>
 </html>
