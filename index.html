@@ -68,7 +68,7 @@
     .titleWrap{min-width:0;flex:1}
     .titleMain{font-weight:700;font-size:17px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     .titleSub{font-size:12px;color:var(--muted);margin-top:2px}
-    .tabs{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:10px 12px 0}
+    .tabs{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;padding:10px 12px 0}
     .tab{border:1px solid var(--line);background:white;border-radius:16px;padding:11px 12px;color:var(--muted)}
     .tab.active{background:var(--tiffany-soft);border-color:#CBEDE9;color:#16423E;font-weight:700}
     .panel{padding:12px}
@@ -367,6 +367,7 @@ html,body{overscroll-behavior:none}
 
     <div class="tabs">
       <button id="tabChats" class="tab active">Чаты</button>
+      <button id="tabGames" class="tab">🎮 Игры</button>
       <button id="tabProfile" class="tab">Профиль</button>
     </div>
 
@@ -379,6 +380,14 @@ html,body{overscroll-behavior:none}
         </button>
         <div id="people"></div>
       </div>
+    </div>
+
+    <div id="gamesPanel" class="panel" style="display:none">
+      <button id="openKolyaJump" class="chatRow" style="width:100%;text-align:left">
+        <div class="groupAvatar" style="background:linear-gradient(135deg,#81D8D0,#b8fff8);color:#07312e">↟</div>
+        <div class="body"><b>КоляДжамп</b><small>Прыгай выше · собирай бусты · бей рекорды</small></div>
+        <span style="font-size:24px">›</span>
+      </button>
     </div>
 
     <div id="profilePanel" class="panel" style="display:none">
@@ -673,8 +682,19 @@ async function enterHome(){
   await loadPeople();
   await startRealtime();
 }
-$("#tabChats").addEventListener("click",()=>{$("#tabChats").classList.add("active");$("#tabProfile").classList.remove("active");$("#chatsPanel").style.display="block";$("#profilePanel").style.display="none"});
-$("#tabProfile").addEventListener("click",()=>{$("#tabProfile").classList.add("active");$("#tabChats").classList.remove("active");$("#chatsPanel").style.display="none";$("#profilePanel").style.display="block"});
+function setHomeTab(tab){
+  ["tabChats","tabGames","tabProfile"].forEach(id=>$("#"+id)?.classList.toggle("active",id===tab));
+  $("#chatsPanel").style.display=tab==="tabChats"?"block":"none";
+  $("#gamesPanel").style.display=tab==="tabGames"?"block":"none";
+  $("#profilePanel").style.display=tab==="tabProfile"?"block":"none";
+}
+$("#tabChats").addEventListener("click",()=>setHomeTab("tabChats"));
+$("#tabGames").addEventListener("click",()=>setHomeTab("tabGames"));
+$("#tabProfile").addEventListener("click",()=>setHomeTab("tabProfile"));
+$("#openKolyaJump").addEventListener("click",()=>{
+  localStorage.setItem("kolyajump.player",JSON.stringify({name:me?.name||"Колян",avatar_url:me?.avatar_url||localStorage.getItem("kolyagram_avatar_photo")||""}));
+  location.href="./kolyajump.html";
+});
 $("#copyInvite").addEventListener("click",()=>toast("Код: "+me.code));
 document.querySelector('[data-chat="group"]').addEventListener("click",()=>openChat("group",null,"Общий чат","Б"));
 $("#back").addEventListener("click",enterHome);
