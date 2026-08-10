@@ -286,6 +286,25 @@ body.isRecording #recordingBar,body.isRecording #recordingBar *{visibility:visib
   left:12px;right:12px;display:flex;justify-content:center;gap:10px
 }
 
+
+/* v8.0: чат не прыгает при отправке/обновлении */
+#chat.active{overflow:hidden}
+#chat #messages{
+  overflow-y:auto!important;
+  overscroll-behavior:contain;
+  -webkit-overflow-scrolling:touch;
+  scroll-behavior:auto!important;
+}
+
+
+.profileSettingRow{
+  margin:12px 0 10px;padding:12px 14px;border-radius:18px;
+  background:rgba(20,175,178,.07);display:flex;align-items:center;gap:12px
+}
+.profileSettingText{display:flex;flex-direction:column;gap:2px;min-width:0;flex:1}
+.profileSettingText small{color:var(--muted);font-size:12px}
+.profileMusicToggle{min-width:72px!important;width:auto!important;margin:0!important}
+
 </style>
 </head>
 <body>
@@ -324,9 +343,9 @@ body.isRecording #recordingBar,body.isRecording #recordingBar *{visibility:visib
         </div>
         
 
-<button id="toggleBackgroundMusic" class="secondary" type="button" style="width:100%;margin-top:10px">🎵 Фоновая музыка: Вкл</button>
 
-<button id="testMessageSound" class="secondary" type="button" style="width:100%;margin-top:10px">🎮 Проверить звук Dota</button>
+
+
 
 <button id="logout" class="circleBtn" aria-label="Выйти">↪</button>
       </div>
@@ -367,10 +386,19 @@ body.isRecording #recordingBar,body.isRecording #recordingBar *{visibility:visib
   </div>
 </div>
 
+
+<div class="profileSettingRow">
+  <div class="profileSettingText">
+    <b>Фоновая музыка</b>
+    <small>Тихая музыка во всём КОЛЯГРАМЕ</small>
+  </div>
+  <button id="toggleBackgroundMusic" class="secondary profileMusicToggle" type="button">Вкл</button>
+</div>
+
 <input id="avatarPhotoInput" type="file" accept="image/*" style="display:none">
 <label for="avatarPhotoInput" class="avatarPick" style="display:block;text-align:center;margin:12px 0 10px">Выбрать фото для аватарки</label>
 <button id="removeAvatarPhoto" class="secondary" style="width:100%;display:none;margin-bottom:10px">Удалить фото</button>
-<button id="copyInvite" class="secondary" style="width:100%">Показать код приглашения</button><div class="versionTag">КОЛЯГРАМ v7.9</div>
+<button id="copyInvite" class="secondary" style="width:100%">Показать код приглашения</button><div class="versionTag">КОЛЯГРАМ v8.3</div>
       </div>
     </div>
   </section>
@@ -687,6 +715,11 @@ function msgHTML(m){
 async function loadMessages(){
   if(READY && !window.KOLYA_MY_ID) window.KOLYA_MY_ID=await currentAuthId();
   const arr=await fetchMessages();
+  const box=$("#messages");
+  const oldScrollTop=box?box.scrollTop:0;
+  const oldScrollHeight=box?box.scrollHeight:0;
+  const wasNearBottom=box ? (box.scrollHeight-box.scrollTop-box.clientHeight<140) : true;
+
   const sig=kolyaSignature(arr.map(m=>({
     id:m.id,sender_id:m.sender_id,kind:m.kind,text:m.text,media_url:m.media_url,
     created_at:m.created_at,delivered_at:m.delivered_at,read_at:m.read_at,
@@ -694,11 +727,24 @@ async function loadMessages(){
   })));
 
   if(sig!==kolyaMessagesSignature){
+    const prevSig=kolyaMessagesSignature;
     kolyaMessagesSignature=sig;
-    $("#messages").innerHTML='<div class="dayline">Сегодня</div>'+arr.map(msgHTML).join("");
-    bindPhotoViewer($("#messages"));
-    const box=$("#messages");
-    if(box)box.scrollTop=box.scrollHeight;
+    if(box){
+      box.innerHTML='<div class="dayline">Сегодня</div>'+arr.map(msgHTML).join("");
+      bindPhotoViewer(box);
+
+      // Если пользователь был внизу, остаёмся внизу.
+      // Если читал старые сообщения, сохраняем его место, а не швыряем наверх.
+      requestAnimationFrame(()=>{
+        if(kolyaForceBottomAfterSend || wasNearBottom || !prevSig){
+          box.scrollTop=box.scrollHeight;
+          kolyaForceBottomAfterSend=false;
+        }else{
+          const delta=box.scrollHeight-oldScrollHeight;
+          box.scrollTop=oldScrollTop+Math.max(0,delta);
+        }
+      });
+    }
   }
   if(READY) await markVisibleMessages();
 }
@@ -715,7 +761,10 @@ async function insertMessage(obj){
   if(READY){const {error}=await supabase.from("messages").insert({
     sender_id:obj.sender_id,sender_name:obj.sender_name,sender_avatar:obj.sender_avatar,
     recipient_id:obj.recipient_id,kind:obj.kind,text:obj.text,media_url:obj.media_url,created_at:obj.created_at
-  }); if(error){toast("Не отправилось");return}}
+  }); 
+  kolyaForceBottomAfterSend=true;
+  forceChatBottomNow();
+if(error){toast("Не отправилось");return}}
   else {let arr=localAll();arr.push({...obj,id:uuid()});saveLocal(arr)}
   await loadMessages();
 }
@@ -806,7 +855,7 @@ document.addEventListener("touchend", e=>{
   lastTouchEnd=now;
 },{passive:false});
 
-if("serviceWorker" in navigator)navigator.serviceWorker.register("./sw.js?v=7.9");
+if("serviceWorker" in navigator)navigator.serviceWorker.register("./sw.js?v=8.3");
 if(me)enterHome();
 
 
@@ -1065,9 +1114,19 @@ async function markVisibleMessages(){
 }
 
 function playIncomingSound(){
-  const a=document.getElementById("messageSound");
-  if(!a)return;
-  try{a.currentTime=0; const p=a.play(); if(p?.catch)p.catch(()=>{});}catch(e){}
+  const base=document.getElementById("messageSound");
+  if(!base)return;
+  try{
+    const a=base.cloneNode(true);
+    a.id="";
+    a.volume=1;
+    a.muted=false;
+    document.body.appendChild(a);
+    const p=a.play();
+    if(p?.catch)p.catch(()=>{});
+    a.addEventListener("ended",()=>a.remove(),{once:true});
+    setTimeout(()=>{try{a.remove()}catch(e){}},15000);
+  }catch(e){}
 }
 
 async function requestKolyagramNotifications(){
@@ -1103,6 +1162,7 @@ async function startRealtime(){
       .on("postgres_changes",{event:"*",schema:"public",table:"messages"},async payload=>{
         const m=payload.new||payload.old||{};
         if(payload.eventType==="INSERT" && m.sender_id && m.sender_id!==myid){
+          duckBackgroundForNotification();
           playIncomingOnce(m);
           showIncomingNotification(m);
         }
@@ -1147,12 +1207,7 @@ async function unlockKolyagramSound(){
 }
 document.addEventListener("click",unlockKolyagramSound,{once:true});
 document.addEventListener("touchend",unlockKolyagramSound,{once:true});
-document.getElementById("testMessageSound")?.addEventListener("click",async()=>{
-  await unlockKolyagramSound();
-  const a=document.getElementById("messageSound");
-  try{a.muted=false;a.volume=1;a.currentTime=0;await a.play();toast("🎮 Звук Dota проверен");}
-  catch(e){toast("iPhone заблокировал звук");}
-});
+
 
 
 let kolyaPeopleSignature="";
@@ -1240,10 +1295,6 @@ let bgMusicUnlocked=false;
 
 function bgAudio(){ return document.getElementById("backgroundMusic"); }
 
-function updateBgButton(){
-  const b=document.getElementById("toggleBackgroundMusic");
-  if(b)b.textContent=`🎵 Фоновая музыка: ${bgMusicEnabled?"Вкл":"Выкл"}`;
-}
 
 async function startBackgroundMusic(){
   const a=bgAudio();
@@ -1269,14 +1320,6 @@ async function unlockBackgroundMusic(){
 document.addEventListener("click",unlockBackgroundMusic,{once:true});
 document.addEventListener("touchend",unlockBackgroundMusic,{once:true});
 
-document.getElementById("toggleBackgroundMusic")?.addEventListener("click",async()=>{
-  bgMusicEnabled=!bgMusicEnabled;
-  localStorage.setItem(BG_MUSIC_KEY,bgMusicEnabled?"on":"off");
-  updateBgButton();
-  if(bgMusicEnabled) await startBackgroundMusic();
-  else stopBackgroundMusic();
-});
-updateBgButton();
 
 // При возвращении в приложение продолжаем музыку, если iOS не убил аудио.
 document.addEventListener("visibilitychange",()=>{
@@ -1311,6 +1354,65 @@ document.addEventListener("pause",e=>{
   const el=e.target;
   if(el instanceof HTMLAudioElement && el.id!=="backgroundMusic" && el.id!=="messageSound") resumeBgAfterVoice();
 },true);
+
+
+function duckBackgroundForNotification(){
+  const bg=document.getElementById("backgroundMusic");
+  if(!bg || bg.paused)return;
+  const old=bg.volume;
+  bg.volume=0.025;
+  setTimeout(()=>{ if(bgMusicEnabled) bg.volume=0.12; },2400);
+}
+
+
+function keepChatAtBottom(){
+  const box=document.getElementById("messages");
+  if(box) requestAnimationFrame(()=>{box.scrollTop=box.scrollHeight});
+}
+
+
+let kolyaForceBottomAfterSend=false;
+
+function forceChatBottomNow(){
+  const box=document.getElementById("messages");
+  if(!box)return;
+  requestAnimationFrame(()=>{
+    box.scrollTop=box.scrollHeight;
+    setTimeout(()=>{box.scrollTop=box.scrollHeight;},80);
+  });
+}
+
+
+document.getElementById("send")?.addEventListener("click",()=>{
+  kolyaForceBottomAfterSend=true;
+  forceChatBottomNow();
+  setTimeout(forceChatBottomNow,180);
+  setTimeout(forceChatBottomNow,450);
+});
+
+
+function updateBackgroundMusicButton(){
+  const b=document.getElementById("toggleBackgroundMusic");
+  if(!b)return;
+  b.textContent=bgMusicEnabled?"Вкл":"Выкл";
+  b.setAttribute("aria-pressed",bgMusicEnabled?"true":"false");
+}
+
+document.getElementById("toggleBackgroundMusic")?.addEventListener("click",async()=>{
+  bgMusicEnabled=!bgMusicEnabled;
+  localStorage.setItem(BG_MUSIC_KEY,bgMusicEnabled?"on":"off");
+  updateBackgroundMusicButton();
+
+  if(bgMusicEnabled){
+    await startBackgroundMusic();
+    toast("Фоновая музыка включена");
+  }else{
+    stopBackgroundMusic();
+    toast("Фоновая музыка выключена");
+  }
+});
+
+updateBackgroundMusicButton();
 
 </script>
 </body>
