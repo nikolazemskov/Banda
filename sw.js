@@ -1,4 +1,4 @@
-const CACHE="kolyagram-v9-5-click-fix";
+const CACHE="kolyagram-v9-6-ranks";
 const STATIC=[
   "./manifest.webmanifest",
   "./icon-180.png",
