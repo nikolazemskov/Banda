@@ -462,7 +462,7 @@ if(READY){
   supabase.channel("banda-live").on("postgres_changes",{event:"INSERT",schema:"public",table:"messages"},()=>{if($("#chat").classList.contains("active"))loadMessages()}).subscribe();
 }
 
-const BANDA_EMOJIS = ["./emojis/egypt_01.png", "./emojis/egypt_02.png", "./emojis/egypt_03.png", "./emojis/egypt_04.png", "./emojis/egypt_05.png", "./emojis/egypt_06.png", "./emojis/egypt_07.png", "./emojis/egypt_08.png", "./emojis/egypt_09.png", "./emojis/egypt_10.png", "./emojis/egypt_11.png", "./emojis/egypt_12.png", "./emojis/egypt_13.png", "./emojis/egypt_14.png", "./emojis/egypt_15.png", "./emojis/egypt_16.png", "./emojis/egypt_17.png", "./emojis/egypt_18.png"];
+const BANDA_EMOJIS = ["./egypt_01.png", "./egypt_02.png", "./egypt_03.png", "./egypt_04.png", "./egypt_05.png", "./egypt_06.png", "./egypt_07.png", "./egypt_08.png", "./egypt_09.png", "./egypt_10.png", "./egypt_11.png", "./egypt_12.png", "./egypt_13.png", "./egypt_14.png", "./egypt_15.png", "./egypt_16.png", "./egypt_17.png", "./egypt_18.png"];
 function renderBandaEmojis(){
   $("#emojiGrid").innerHTML=BANDA_EMOJIS.map(src=>`<button class="emojiPick" data-sticker="${src}"><img src="${src}" alt="Эмодзи"></button>`).join("");
   document.querySelectorAll("[data-sticker]").forEach(b=>b.addEventListener("click",async()=>{
