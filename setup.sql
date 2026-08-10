@@ -23,7 +23,7 @@ create table if not exists public.messages(
   sender_name text not null,
   sender_avatar text not null default '🙂',
   recipient_id uuid references auth.users(id) on delete cascade,
-  kind text not null default 'text' check(kind in ('text','photo','voice')),
+  kind text not null default 'text' check(kind in ('text','photo','voice','sticker')),
   text text not null default '',
   media_url text,
   created_at timestamptz not null default now()
