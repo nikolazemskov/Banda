@@ -228,6 +228,15 @@ body.isRecording #recordingBar,body.isRecording #recordingBar *{visibility:visib
   min-width:38px;height:28px;padding:0 7px;font-weight:900;font-size:12px;margin-left:6px
 }
 
+
+/* v6.5 custom voice player */
+.voicePlayer{display:flex;align-items:center;gap:8px;min-width:230px;max-width:100%}
+.voicePlay{width:38px;height:38px;flex:0 0 38px;border:0;border-radius:50%;background:#20b9bc;color:white;font-size:16px;font-weight:900}
+.voiceSeek{min-width:90px;flex:1;accent-color:#20b9bc}
+.voiceClock{font-size:11px;font-weight:800;min-width:68px;text-align:center;font-variant-numeric:tabular-nums;white-space:nowrap}
+.voiceSpeed{flex:0 0 auto!important;margin-left:0!important}
+.voiceNativeHidden{display:none!important}
+
 </style>
 </head>
 <body>
@@ -295,7 +304,7 @@ body.isRecording #recordingBar,body.isRecording #recordingBar *{visibility:visib
         <input id="avatarPhotoInput" type="file" accept="image/*" style="display:none">
 <label for="avatarPhotoInput" class="avatarPick" style="display:block;text-align:center;margin:12px 0 10px">Выбрать фото для аватарки</label>
 <button id="removeAvatarPhoto" class="secondary" style="width:100%;display:none;margin-bottom:10px">Удалить фото</button>
-<button id="copyInvite" class="secondary" style="width:100%">Показать код приглашения</button><div class="versionTag">КОЛЯГРАМ v6.4</div>
+<button id="copyInvite" class="secondary" style="width:100%">Показать код приглашения</button><div class="versionTag">КОЛЯГРАМ v6.5</div>
       </div>
     </div>
   </section>
@@ -609,7 +618,7 @@ document.addEventListener("touchend", e=>{
   lastTouchEnd=now;
 },{passive:false});
 
-if("serviceWorker" in navigator)navigator.serviceWorker.register("./sw.js?v=6.4");
+if("serviceWorker" in navigator)navigator.serviceWorker.register("./sw.js?v=6.5");
 if(me)enterHome();
 
 
@@ -720,34 +729,93 @@ document.getElementById("sendRecord")?.addEventListener("click",()=>{
 });
 
 
+
+
+
 (function(){
-  function enhanceVoice(audio){
-    if(!audio || audio.dataset.speedReady==="1") return;
-    audio.dataset.speedReady="1";
-    const btn=document.createElement("button");
-    btn.type="button";
-    btn.className="voiceSpeed";
-    btn.textContent="1×";
-    btn.setAttribute("aria-label","Скорость голосового");
-    const speeds=[1,2,3];
-    let i=0;
-    btn.addEventListener("click",e=>{
-      e.preventDefault();e.stopPropagation();
-      i=(i+1)%speeds.length;
-      audio.playbackRate=speeds[i];
-      btn.textContent=speeds[i]+"×";
-    });
-    audio.insertAdjacentElement("afterend",btn);
+  const systemIds=new Set(["recordStartSound","recordStopSound","messageSound"]);
+  let activeAudio=null;
+
+  function fmt(v){
+    if(!Number.isFinite(v)||v<0)return "00:00";
+    const m=Math.floor(v/60),s=Math.floor(v%60);
+    return String(m).padStart(2,"0")+":"+String(s).padStart(2,"0");
   }
-  function scan(root=document){
-    root.querySelectorAll?.("audio").forEach(a=>{
-      if(!["recordStartSound","recordStopSound","messageSound"].includes(a.id)) enhanceVoice(a);
+
+  function pauseOthers(audio){
+    document.querySelectorAll("audio[data-kvoice='1']").forEach(a=>{
+      if(a!==audio && !a.paused) a.pause();
     });
+  }
+
+  function build(audio){
+    if(!audio || systemIds.has(audio.id) || audio.dataset.kvoice==="1")return;
+    audio.dataset.kvoice="1";
+    audio.classList.add("voiceNativeHidden");
+    audio.controls=false;
+
+    const box=document.createElement("div"); box.className="voicePlayer";
+    const play=document.createElement("button"); play.type="button"; play.className="voicePlay"; play.textContent="▶";
+    const seek=document.createElement("input"); seek.type="range"; seek.className="voiceSeek"; seek.min="0"; seek.max="1000"; seek.value="0"; seek.step="1";
+    const clock=document.createElement("span"); clock.className="voiceClock"; clock.textContent="00:00 / 00:00";
+    const speed=document.createElement("button"); speed.type="button"; speed.className="voiceSpeed"; speed.textContent="1×";
+
+    box.append(play,seek,clock,speed);
+    audio.insertAdjacentElement("afterend",box);
+
+    let speeds=[1,2,3],si=0,seeking=false;
+
+    function update(){
+      const d=audio.duration;
+      const c=audio.currentTime||0;
+      if(!seeking && Number.isFinite(d) && d>0) seek.value=Math.round((c/d)*1000);
+      clock.textContent=fmt(c)+" / "+fmt(d);
+      play.textContent=audio.paused?"▶":"❚❚";
+    }
+    audio.addEventListener("loadedmetadata",update);
+    audio.addEventListener("durationchange",update);
+    audio.addEventListener("timeupdate",update);
+    audio.addEventListener("play",()=>{pauseOthers(audio);activeAudio=audio;update();});
+    audio.addEventListener("pause",update);
+    audio.addEventListener("ended",()=>{audio.currentTime=0;update();});
+
+    play.addEventListener("click",e=>{
+      e.preventDefault();e.stopPropagation();
+      if(audio.paused){ pauseOthers(audio); audio.play().catch(()=>{}); }
+      else audio.pause();
+    });
+
+    seek.addEventListener("input",()=>{
+      seeking=true;
+      const d=audio.duration;
+      if(Number.isFinite(d)&&d>0){
+        const preview=(Number(seek.value)/1000)*d;
+        clock.textContent=fmt(preview)+" / "+fmt(d);
+      }
+    });
+    seek.addEventListener("change",()=>{
+      const d=audio.duration;
+      if(Number.isFinite(d)&&d>0)audio.currentTime=(Number(seek.value)/1000)*d;
+      seeking=false;update();
+    });
+
+    speed.addEventListener("click",e=>{
+      e.preventDefault();e.stopPropagation();
+      si=(si+1)%speeds.length;
+      audio.playbackRate=speeds[si];
+      speed.textContent=speeds[si]+"×";
+    });
+
+    if(audio.readyState>=1)update();
+  }
+
+  function scan(root=document){
+    root.querySelectorAll?.("audio").forEach(build);
   }
   scan();
   new MutationObserver(ms=>ms.forEach(m=>m.addedNodes.forEach(n=>{
     if(n.nodeType!==1)return;
-    if(n.tagName==="AUDIO" && !["recordStartSound","recordStopSound","messageSound"].includes(n.id)) enhanceVoice(n);
+    if(n.tagName==="AUDIO")build(n);
     scan(n);
   }))).observe(document.body,{childList:true,subtree:true});
 })();
