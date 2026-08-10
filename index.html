@@ -203,6 +203,31 @@
 .cancelRecord{width:42px;height:42px;border:0;border-radius:14px;background:#e53935;color:white;font-size:24px;line-height:1}
 body.isRecording #mic{background:#e53935!important;color:#fff!important}
 
+
+.recordingBar{
+  display:none!important;
+  align-items:center!important;
+  gap:10px!important;
+  padding:8px 10px!important;
+}
+.recordingBar.show{display:flex!important}
+.recordCenter{min-width:0;flex:1;display:flex;align-items:center;justify-content:center;gap:10px}
+.recordAction{flex:0 0 44px;width:44px;height:44px;border:0;border-radius:15px;font-size:23px;font-weight:900;display:grid;place-items:center}
+.cancelRecord{background:#ef4444!important;color:#fff!important}
+.sendRecord{background:#22bfc1;color:#fff}
+.voiceWave{height:25px;display:flex;align-items:center;gap:3px;overflow:hidden}
+.voiceWave i{display:block;width:3px;border-radius:5px;background:#e53935;animation:wave .8s ease-in-out infinite}
+.voiceWave i:nth-child(1){height:8px}.voiceWave i:nth-child(2){height:17px;animation-delay:.12s}
+.voiceWave i:nth-child(3){height:24px;animation-delay:.24s}.voiceWave i:nth-child(4){height:14px;animation-delay:.36s}
+.voiceWave i:nth-child(5){height:9px;animation-delay:.48s}
+@keyframes wave{50%{transform:scaleY(.45);opacity:.55}}
+body.isRecording .composer>*{visibility:hidden}
+body.isRecording #recordingBar,body.isRecording #recordingBar *{visibility:visible}
+.voiceSpeed{
+  border:0;background:rgba(20,175,178,.12);color:#148f92;border-radius:10px;
+  min-width:38px;height:28px;padding:0 7px;font-weight:900;font-size:12px;margin-left:6px
+}
+
 </style>
 </head>
 <body>
@@ -270,7 +295,7 @@ body.isRecording #mic{background:#e53935!important;color:#fff!important}
         <input id="avatarPhotoInput" type="file" accept="image/*" style="display:none">
 <label for="avatarPhotoInput" class="avatarPick" style="display:block;text-align:center;margin:12px 0 10px">Выбрать фото для аватарки</label>
 <button id="removeAvatarPhoto" class="secondary" style="width:100%;display:none;margin-bottom:10px">Удалить фото</button>
-<button id="copyInvite" class="secondary" style="width:100%">Показать код приглашения</button><div class="versionTag">КОЛЯГРАМ v6.3</div>
+<button id="copyInvite" class="secondary" style="width:100%">Показать код приглашения</button><div class="versionTag">КОЛЯГРАМ v6.4</div>
       </div>
     </div>
   </section>
@@ -334,10 +359,13 @@ body.isRecording #mic{background:#e53935!important;color:#fff!important}
 </div>
 
 <div id="recordingBar" class="recordingBar">
-  <span class="recordDot"></span>
-  <span class="recordingText">Идёт запись</span>
-  <span id="recordingTime" class="recordingTime">00:00</span>
-  <button id="cancelRecord" class="cancelRecord" aria-label="Отменить запись">×</button>
+  <button id="cancelRecord" class="recordAction cancelRecord" aria-label="Отменить запись">×</button>
+  <div class="recordCenter">
+    <span class="recordDot"></span>
+    <span id="recordingTime" class="recordingTime">00:00</span>
+    <span class="voiceWave" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>
+  </div>
+  <button id="sendRecord" class="recordAction sendRecord" aria-label="Отправить голосовое">➤</button>
 </div>
 <audio id="recordStartSound" src="./record-start.wav" preload="auto"></audio>
 <audio id="recordStopSound" src="./record-stop.wav" preload="auto"></audio>
@@ -581,7 +609,7 @@ document.addEventListener("touchend", e=>{
   lastTouchEnd=now;
 },{passive:false});
 
-if("serviceWorker" in navigator)navigator.serviceWorker.register("./sw.js?v=6.3");
+if("serviceWorker" in navigator)navigator.serviceWorker.register("./sw.js?v=6.4");
 if(me)enterHome();
 
 
@@ -675,6 +703,54 @@ document.getElementById("cancelRecord")?.addEventListener("click",()=>{
   try{ if(typeof recorder!=="undefined" && recorder && recorder.state!=="inactive") recorder.stop(); }catch(e){}
   kolyaHideRecording(false);
 });
+
+
+document.getElementById("sendRecord")?.addEventListener("click",()=>{
+  kolyaCancelRecording=false;
+  try{
+    if(typeof mediaRecorder!=="undefined" && mediaRecorder && mediaRecorder.state!=="inactive"){
+      mediaRecorder.stop(); return;
+    }
+  }catch(e){}
+  try{
+    if(typeof recorder!=="undefined" && recorder && recorder.state!=="inactive"){
+      recorder.stop(); return;
+    }
+  }catch(e){}
+});
+
+
+(function(){
+  function enhanceVoice(audio){
+    if(!audio || audio.dataset.speedReady==="1") return;
+    audio.dataset.speedReady="1";
+    const btn=document.createElement("button");
+    btn.type="button";
+    btn.className="voiceSpeed";
+    btn.textContent="1×";
+    btn.setAttribute("aria-label","Скорость голосового");
+    const speeds=[1,2,3];
+    let i=0;
+    btn.addEventListener("click",e=>{
+      e.preventDefault();e.stopPropagation();
+      i=(i+1)%speeds.length;
+      audio.playbackRate=speeds[i];
+      btn.textContent=speeds[i]+"×";
+    });
+    audio.insertAdjacentElement("afterend",btn);
+  }
+  function scan(root=document){
+    root.querySelectorAll?.("audio").forEach(a=>{
+      if(!["recordStartSound","recordStopSound","messageSound"].includes(a.id)) enhanceVoice(a);
+    });
+  }
+  scan();
+  new MutationObserver(ms=>ms.forEach(m=>m.addedNodes.forEach(n=>{
+    if(n.nodeType!==1)return;
+    if(n.tagName==="AUDIO" && !["recordStartSound","recordStopSound","messageSound"].includes(n.id)) enhanceVoice(n);
+    scan(n);
+  }))).observe(document.body,{childList:true,subtree:true});
+})();
 
 </script>
 </body>
