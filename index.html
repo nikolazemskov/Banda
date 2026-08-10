@@ -188,6 +188,21 @@
 .profileAvatarBox .avatar,.profileAvatarBox .profileAvatar{width:92px;height:92px;border-radius:28px}
 .brandName{font-size:22px!important;letter-spacing:.16em!important;background:linear-gradient(135deg,#0aaeb2,#68dedc 55%,#178d91)!important;-webkit-background-clip:text!important;background-clip:text!important;color:transparent!important;text-shadow:none!important}
 
+
+.recordingBar{
+  display:none;align-items:center;gap:10px;position:fixed;left:12px;right:12px;
+  bottom:calc(env(safe-area-inset-bottom) + 12px);z-index:60;padding:10px 12px;
+  background:rgba(255,247,247,.98);border:1px solid rgba(220,50,50,.25);
+  border-radius:20px;box-shadow:0 12px 35px rgba(140,20,20,.16);backdrop-filter:blur(18px)
+}
+.recordingBar.show{display:flex}
+.recordDot{width:10px;height:10px;border-radius:50%;background:#e53935;box-shadow:0 0 0 5px rgba(229,57,53,.12);animation:recpulse 1s infinite}
+@keyframes recpulse{50%{opacity:.45;transform:scale(.85)}}
+.recordingText{font-weight:900;color:#d62f2f;flex:1}
+.recordingTime{font-variant-numeric:tabular-nums;color:#9b3333;font-weight:800}
+.cancelRecord{width:42px;height:42px;border:0;border-radius:14px;background:#e53935;color:white;font-size:24px;line-height:1}
+body.isRecording #mic{background:#e53935!important;color:#fff!important}
+
 </style>
 </head>
 <body>
@@ -255,7 +270,7 @@
         <input id="avatarPhotoInput" type="file" accept="image/*" style="display:none">
 <label for="avatarPhotoInput" class="avatarPick" style="display:block;text-align:center;margin:12px 0 10px">Выбрать фото для аватарки</label>
 <button id="removeAvatarPhoto" class="secondary" style="width:100%;display:none;margin-bottom:10px">Удалить фото</button>
-<button id="copyInvite" class="secondary" style="width:100%">Показать код приглашения</button><div class="versionTag">КОЛЯГРАМ v6.2</div>
+<button id="copyInvite" class="secondary" style="width:100%">Показать код приглашения</button><div class="versionTag">КОЛЯГРАМ v6.3</div>
       </div>
     </div>
   </section>
@@ -317,6 +332,17 @@
     </div>
   </section>
 </div>
+
+<div id="recordingBar" class="recordingBar">
+  <span class="recordDot"></span>
+  <span class="recordingText">Идёт запись</span>
+  <span id="recordingTime" class="recordingTime">00:00</span>
+  <button id="cancelRecord" class="cancelRecord" aria-label="Отменить запись">×</button>
+</div>
+<audio id="recordStartSound" src="./record-start.wav" preload="auto"></audio>
+<audio id="recordStopSound" src="./record-stop.wav" preload="auto"></audio>
+<audio id="messageSound" src="./message-fart.wav" preload="auto"></audio>
+
 <div id="toast" class="toast"></div>
 
 <script type="module">
@@ -506,7 +532,7 @@ $("#mic").addEventListener("click",async()=>{
     const type=MediaRecorder.isTypeSupported("audio/mp4")?"audio/mp4":"audio/webm";
     chunks=[];recorder=new MediaRecorder(stream,{mimeType:type});
     recorder.ondataavailable=e=>{if(e.data.size)chunks.push(e.data)};
-    recorder.onstop=async()=>{
+    recorder.onstop=async()=>{ if(kolyaCancelRecording){kolyaCancelRecording=false;kolyaHideRecording(false);return;} kolyaHideRecording(true);
       clearInterval(timer);$("#recordBar").classList.remove("show");stream?.getTracks().forEach(t=>t.stop());
       const blob=new Blob(chunks,{type});
       if(READY){
@@ -521,7 +547,7 @@ $("#mic").addEventListener("click",async()=>{
         toast("Демо-голосовое живёт до перезапуска");
       }
     };
-    recorder.start();recordStarted=Date.now();$("#recordBar").classList.add("show");
+    recorder.start(); kolyaShowRecording();recordStarted=Date.now();$("#recordBar").classList.add("show");
     timer=setInterval(()=>{const s=Math.floor((Date.now()-recordStarted)/1000);$("#recordText").textContent=`Запись голосового · ${Math.floor(s/60)}:${String(s%60).padStart(2,"0")} · нажми ещё раз для отправки`},500);
   }catch(e){toast("Разреши микрофон")}
 });
@@ -555,7 +581,7 @@ document.addEventListener("touchend", e=>{
   lastTouchEnd=now;
 },{passive:false});
 
-if("serviceWorker" in navigator)navigator.serviceWorker.register("./sw.js?v=6.2");
+if("serviceWorker" in navigator)navigator.serviceWorker.register("./sw.js?v=6.3");
 if(me)enterHome();
 
 
@@ -613,6 +639,42 @@ if(me)enterHome();
     showAvatar(null);
   });
 })();
+
+
+let kolyaRecordingTimer=null, kolyaRecordingStarted=0, kolyaCancelRecording=false;
+function kolyaPlay(id){
+  const a=document.getElementById(id);
+  if(!a)return;
+  try{a.currentTime=0; const p=a.play(); if(p&&p.catch)p.catch(()=>{});}catch(e){}
+}
+function kolyaShowRecording(){
+  kolyaCancelRecording=false;
+  kolyaRecordingStarted=Date.now();
+  document.body.classList.add("isRecording");
+  const bar=document.getElementById("recordingBar");
+  if(bar)bar.classList.add("show");
+  kolyaPlay("recordStartSound");
+  clearInterval(kolyaRecordingTimer);
+  kolyaRecordingTimer=setInterval(()=>{
+    const el=document.getElementById("recordingTime"); if(!el)return;
+    const sec=Math.floor((Date.now()-kolyaRecordingStarted)/1000);
+    el.textContent=String(Math.floor(sec/60)).padStart(2,"0")+":"+String(sec%60).padStart(2,"0");
+  },250);
+}
+function kolyaHideRecording(playStop=true){
+  document.body.classList.remove("isRecording");
+  const bar=document.getElementById("recordingBar");
+  if(bar)bar.classList.remove("show");
+  clearInterval(kolyaRecordingTimer);
+  kolyaRecordingTimer=null;
+  if(playStop)kolyaPlay("recordStopSound");
+}
+document.getElementById("cancelRecord")?.addEventListener("click",()=>{
+  kolyaCancelRecording=true;
+  try{ if(typeof mediaRecorder!=="undefined" && mediaRecorder && mediaRecorder.state!=="inactive") mediaRecorder.stop(); }catch(e){}
+  try{ if(typeof recorder!=="undefined" && recorder && recorder.state!=="inactive") recorder.stop(); }catch(e){}
+  kolyaHideRecording(false);
+});
 
 </script>
 </body>
