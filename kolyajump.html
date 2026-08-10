@@ -1,5 +1,323 @@
-<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no"><meta name="theme-color" content="#061719"><title>КоляДжамп</title><style>
-*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}html,body{margin:0;background:#041113;color:#efffff;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display",sans-serif;overflow:hidden}#wrap{height:100dvh;max-width:560px;margin:auto;position:relative;background:radial-gradient(circle at 50% 0,#123c3e,#061719 45%,#02090b)}canvas{width:100%;height:100%;display:block;touch-action:none}.top{position:absolute;top:calc(env(safe-area-inset-top) + 10px);left:12px;right:12px;display:flex;justify-content:space-between;align-items:center;z-index:4}.back,.sound{border:1px solid #81d8d055;background:#092326dd;color:#bafff8;border-radius:16px;height:46px;padding:0 15px;font-weight:800}.title{text-align:center;font-weight:950;font-size:18px}.title small{display:block;font-size:10px;color:#8eb8b5;letter-spacing:.12em;margin-top:2px}.hud{position:absolute;top:calc(env(safe-area-inset-top) + 68px);left:14px;right:14px;display:flex;justify-content:space-between;pointer-events:none}.card{background:#06191cdd;border:1px solid #81d8d033;border-radius:18px;padding:9px 12px;min-width:96px;backdrop-filter:blur(12px)}.card:last-child{text-align:right}.lab{font-size:9px;color:#8eb8b5;letter-spacing:.13em}.val{font-size:20px;font-weight:950}.controls{position:absolute;left:20px;right:20px;bottom:calc(env(safe-area-inset-bottom) + 20px);display:flex;justify-content:space-between}.ctrl{width:94px;height:94px;border-radius:50%;border:1px solid #a6f3ea55;background:linear-gradient(#123b3ddd,#071f22ee);color:#a6f3ea;font-size:50px;box-shadow:0 18px 40px #0008,inset 0 1px #fff2}.ctrl:active{transform:scale(.93)}#start{position:absolute;left:50%;bottom:calc(env(safe-area-inset-bottom) + 43px);transform:translateX(-50%);border:0;border-radius:999px;padding:16px 24px;background:linear-gradient(135deg,#b8fff8,#65cec5);color:#052321;font-weight:950;box-shadow:0 15px 35px #81d8d044}.boost{position:absolute;top:150px;left:50%;transform:translate(-50%,-10px);opacity:0;background:#a6f3ea;color:#052321;border-radius:999px;padding:9px 14px;font-weight:950;transition:.18s}.boost.show{opacity:1;transform:translate(-50%,0)}
-</style></head><body><div id="wrap"><canvas id="g" width="450" height="800"></canvas><div class="top"><button class="back" onclick="location.href='./index.html'">‹ Назад</button><div class="title">КоляДжамп<small>НЕДЕЛЬНЫЙ ТУРНИР</small></div><button id="snd" class="sound">🔊</button></div><div class="hud"><div class="card"><div class="lab">СЧЁТ</div><div id="score" class="val">0</div></div><div class="card"><div class="lab">ВЫСОТА</div><div id="height" class="val">0 м</div></div></div><div id="boost" class="boost">БУСТ</div><div class="controls"><button id="L" class="ctrl">‹</button><button id="R" class="ctrl">›</button></div><button id="start">▶ ИГРАТЬ</button></div><script>
-const c=document.querySelector('#g'),x=c.getContext('2d'),W=c.width,H=c.height,$=s=>document.querySelector(s);let run=0,left=0,right=0,cam=0,score=0,height=0,last=0,sound=1,plats=[],items=[],parts=[];let player={x:200,y:610,w:52,h:82,vx:0,vy:-760};let info={name:'Колян',avatar_url:''};try{info=JSON.parse(localStorage.getItem('kolyajump.player'))||info}catch{};const face=new Image();if(info.avatar_url)face.src=info.avatar_url;const fart=new Audio('./kolyajump-fart.mp3'),burp=new Audio('./kolyajump-burp.mp3');fart.playbackRate=1.8;burp.playbackRate=1.2;function play(a){if(!sound)return;a.pause();a.currentTime=0;a.play().catch(()=>{})}function diff(){let l=Math.min(12,1+Math.floor(height/150));return{l,g:1850+l*65,j:755+l*5,gap:82+l*5,w:115-l*4.5,spd:1+(l-1)*.05}}function add(y){let d=diff(),w=Math.max(55,d.w+Math.random()*35),p={x:18+Math.random()*(W-w-36),y,w,h:15,type:Math.random()<Math.min(.32,d.l*.025)?'move':Math.random()<Math.min(.22,(d.l-2)*.025)?'break':'normal',base:0,ph:Math.random()*6.28,dead:0};p.base=p.x;plats.push(p);if(Math.random()<.24)items.push({x:p.x+w/2,y:y-35,t:['🍺','🍸','🥃','🌵'][Math.floor(Math.random()*4)],on:1})}function reset(){score=height=cam=0;player={x:200,y:610,w:52,h:82,vx:0,vy:-760};plats=[];items=[];parts=[];let y=690;plats.push({x:155,y,w:140,h:15,type:'normal',base:155,ph:0,dead:0});for(let i=0;i<16;i++){y-=90+Math.random()*30;add(y)}draw(0)}function rr(a,b,w,h,r){x.beginPath();x.roundRect(a,b,w,h,r)}function bg(){let g=x.createLinearGradient(0,0,0,H);g.addColorStop(0,'#12383b');g.addColorStop(.5,'#071b1e');g.addColorStop(1,'#02090b');x.fillStyle=g;x.fillRect(0,0,W,H);for(let i=0;i<45;i++){x.globalAlpha=.15+(i%5)*.06;x.fillStyle='#dffffb';x.fillRect((i*89)%W,(i*137)%H,1.5,1.5)}x.globalAlpha=1}function bottle(o,t){if(!o.on)return;let yy=o.y-cam+Math.sin(t*.004+o.x)*4;if(yy<-30||yy>H)return;x.font='28px sans-serif';x.textAlign='center';x.shadowColor='#81d8d0';x.shadowBlur=14;x.fillText(o.t,o.x,yy);x.shadowBlur=0}function dude(){let y=player.y-cam,cx=player.x+26;x.strokeStyle='#071315';x.lineWidth=10;x.lineCap='round';x.beginPath();x.moveTo(player.x+19,y+58);x.lineTo(player.x+13,y+79);x.moveTo(player.x+34,y+58);x.lineTo(player.x+41,y+79);x.moveTo(player.x+13,y+36);x.lineTo(player.x+2,y+49);x.moveTo(player.x+40,y+36);x.lineTo(player.x+51,y+48);x.stroke();let g=x.createLinearGradient(0,y+25,0,y+67);g.addColorStop(0,'#183337');g.addColorStop(1,'#061315');x.fillStyle=g;rr(player.x+9,y+27,35,40,13);x.fill();x.fillStyle='#81d8d0';rr(player.x+19,y+34,15,4,2);x.fill();x.save();x.beginPath();x.arc(cx,y+18,23,0,Math.PI*2);x.clip();if(face.complete&&face.naturalWidth){let s=Math.min(face.naturalWidth,face.naturalHeight),sx=(face.naturalWidth-s)/2,sy=Math.max(0,(face.naturalHeight-s)*.18);x.drawImage(face,sx,sy,s,s,cx-24,y-6,48,48)}else{x.fillStyle='#d6aa8c';x.fillRect(cx-24,y-6,48,48);x.fillStyle='#102022';x.font='bold 22px sans-serif';x.textAlign='center';x.fillText((info.name||'К')[0],cx,y+25)}x.restore();x.strokeStyle='#dffffb';x.lineWidth=2;x.beginPath();x.arc(cx,y+18,23,0,Math.PI*2);x.stroke()}function draw(t){bg();for(let p of plats){let yy=p.y-cam;if(yy<-30||yy>H+30||p.dead)continue;let gr=x.createLinearGradient(0,yy,0,yy+15);gr.addColorStop(0,'#c4fff9');gr.addColorStop(.35,'#81D8D0');gr.addColorStop(1,'#2b8c87');x.shadowColor='#81D8D077';x.shadowBlur=18;x.fillStyle=gr;rr(p.x,yy,p.w,15,8);x.fill();x.shadowBlur=0;if(p.type==='move'){x.fillStyle='#06302f';x.font='bold 11px sans-serif';x.textAlign='center';x.fillText('↔',p.x+p.w/2,yy+11)}if(p.type==='break'){x.strokeStyle='#275f5c';x.beginPath();x.moveTo(p.x+p.w*.45,yy+1);x.lineTo(p.x+p.w*.52,yy+8);x.lineTo(p.x+p.w*.47,yy+14);x.stroke()}}items.forEach(o=>bottle(o,t));dude()}function boost(o){play(burp);$('#boost').textContent=o.t+' БУСТ';$('#boost').classList.add('show');setTimeout(()=>$('#boost').classList.remove('show'),650);if(o.t==='🍺')player.vy=-900;if(o.t==='🍸')player.vy=-1040;if(o.t==='🥃')score+=800;if(o.t==='🌵'){player.vy=-950;player.vx*=1.5}score+=350}function upd(dt,t){let d=diff();if(left)player.vx-=900*dt;if(right)player.vx+=900*dt;if(!left&&!right)player.vx*=Math.pow(.001,dt);player.vx=Math.max(-390,Math.min(390,player.vx));player.x+=player.vx*dt*d.spd;if(player.x<-45)player.x=W;if(player.x>W)player.x=-45;let old=player.y+player.h;player.vy+=d.g*dt*d.spd;player.y+=player.vy*dt*d.spd;let now=player.y+player.h;for(let p of plats){if(p.type==='move')p.x=p.base+Math.sin(t*.0018+p.ph)*40;if(!p.dead&&player.vy>0&&old<=p.y+3&&now>=p.y&&player.x+44>p.x&&player.x+8<p.x+p.w){player.y=p.y-player.h;player.vy=-d.j;score+=100+d.l*10;play(fart);if(p.type==='break')setTimeout(()=>p.dead=1,80);break}}for(let o of items)if(o.on&&Math.hypot(player.x+26-o.x,player.y+35-o.y)<35){o.on=0;boost(o)}if(player.y-cam<H*.39){let oldc=cam;cam=player.y-H*.39;height+=Math.max(0,oldc-cam)*.14;score+=Math.max(0,oldc-cam)*.3}let min=Math.min(...plats.map(p=>p.y));while(min-cam>-150){min-=d.gap+Math.random()*45;add(min)}plats=plats.filter(p=>p.y-cam<H+100);items=items.filter(o=>o.y-cam<H+100&&o.on);$('#score').textContent=Math.floor(score).toLocaleString('ru');$('#height').textContent=Math.floor(height)+' м';if(player.y-cam>H+100){run=0;$('#start').style.display='block';$('#start').textContent='↻ ЕЩЁ РАЗ';return 0}return 1}function loop(t){if(!run)return;let dt=Math.min(.025,(t-last)/1000||.016);last=t;if(upd(dt,t)){draw(t);requestAnimationFrame(loop)}else draw(t)}function hold(id,set){let e=$(id);e.onpointerdown=a=>{a.preventDefault();set(1)};['onpointerup','onpointercancel','onpointerleave'].forEach(k=>e[k]=a=>{a.preventDefault();set(0)})}hold('#L',v=>left=v);hold('#R',v=>right=v);$('#start').onclick=()=>{reset();run=1;last=performance.now();$('#start').style.display='none';requestAnimationFrame(loop)};$('#snd').onclick=e=>{sound=!sound;e.currentTarget.textContent=sound?'🔊':'🔇'};face.onload=()=>draw(0);reset();
-</script></body></html>
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="theme-color" content="#061719">
+<title>КоляДжамп</title>
+<style>
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:#041113;color:#efffff;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display",sans-serif;overflow:hidden}
+#wrap{height:100dvh;max-width:560px;margin:auto;position:relative;background:radial-gradient(circle at 50% 0,#123c3e,#061719 45%,#02090b)}
+canvas{width:100%;height:100%;display:block;touch-action:none}
+.top{position:absolute;top:calc(env(safe-area-inset-top) + 10px);left:12px;right:12px;display:flex;justify-content:space-between;align-items:center;z-index:8}
+.back,.sound{border:1px solid #81d8d055;background:#092326dd;color:#bafff8;border-radius:16px;height:46px;padding:0 15px;font-weight:800}
+.title{text-align:center;font-weight:950;font-size:18px}.title small{display:block;font-size:10px;color:#8eb8b5;letter-spacing:.12em;margin-top:2px}
+.hud{position:absolute;top:calc(env(safe-area-inset-top) + 68px);left:14px;right:14px;display:flex;justify-content:space-between;pointer-events:none;z-index:5}
+.card{background:#06191cdd;border:1px solid #81d8d033;border-radius:18px;padding:9px 12px;min-width:96px;backdrop-filter:blur(12px)}
+.card:last-child{text-align:right}.lab{font-size:9px;color:#8eb8b5;letter-spacing:.13em}.val{font-size:20px;font-weight:950}
+.controls{position:absolute;left:20px;right:20px;bottom:calc(env(safe-area-inset-bottom) + 20px);display:flex;justify-content:space-between;z-index:6}
+.ctrl{width:94px;height:94px;border-radius:50%;border:1px solid #a6f3ea55;background:linear-gradient(#123b3ddd,#071f22ee);color:#a6f3ea;font-size:50px;box-shadow:0 18px 40px #0008,inset 0 1px #fff2}
+.ctrl:active{transform:scale(.93)}
+#start{position:absolute;left:50%;bottom:calc(env(safe-area-inset-bottom) + 43px);transform:translateX(-50%);border:0;border-radius:999px;padding:16px 24px;background:linear-gradient(135deg,#b8fff8,#65cec5);color:#052321;font-weight:950;box-shadow:0 15px 35px #81d8d044;z-index:7}
+.boost{position:absolute;top:150px;left:50%;transform:translate(-50%,-10px);opacity:0;background:#a6f3ea;color:#052321;border-radius:999px;padding:9px 14px;font-weight:950;transition:.18s;z-index:9}
+.boost.show{opacity:1;transform:translate(-50%,0)}
+
+#chooser{position:absolute;inset:0;z-index:20;background:
+ radial-gradient(circle at 50% 12%,rgba(129,216,208,.16),transparent 31%),
+ linear-gradient(180deg,rgba(3,15,17,.97),rgba(2,9,11,.995));
+ padding:calc(env(safe-area-inset-top) + 74px) 16px calc(env(safe-area-inset-bottom) + 20px);
+ overflow:auto}
+.chooseTitle{text-align:center;font-size:25px;font-weight:1000;letter-spacing:-.02em}
+.chooseSub{text-align:center;color:#8eb8b5;font-size:13px;margin:7px auto 18px;max-width:340px}
+.heroes{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:11px}
+.heroCard{position:relative;border:1px solid #81d8d033;background:linear-gradient(180deg,#0b2528,#061618);border-radius:22px;padding:12px;color:white;text-align:left;min-height:150px;overflow:hidden;box-shadow:inset 0 1px rgba(255,255,255,.03)}
+.heroCard:last-child{grid-column:1/-1}
+.heroCard.selected{border-color:#a6f3eaaa;box-shadow:0 0 0 2px #81d8d022,0 16px 40px #0005}
+.heroArt{height:92px;position:relative;display:grid;place-items:center}
+.heroName{font-weight:950;font-size:15px}.heroType{font-size:10px;color:#8eb8b5;margin-top:3px;text-transform:uppercase;letter-spacing:.08em}
+.check{position:absolute;right:10px;top:10px;width:25px;height:25px;border-radius:50%;display:grid;place-items:center;background:#81d8d0;color:#052321;font-weight:1000;opacity:0;transform:scale(.7);transition:.15s}
+.heroCard.selected .check{opacity:1;transform:scale(1)}
+#chooseBtn{position:sticky;bottom:0;margin-top:14px;width:100%;border:0;border-radius:18px;padding:16px;background:linear-gradient(135deg,#b8fff8,#65cec5);color:#052321;font-size:15px;font-weight:1000;box-shadow:0 18px 45px #0008}
+.tip{margin-top:12px;text-align:center;color:#769e9c;font-size:11px}
+</style>
+</head>
+<body>
+<div id="wrap">
+<canvas id="g" width="450" height="800"></canvas>
+<div class="top">
+  <button class="back" onclick="location.href='./index.html'">‹ Назад</button>
+  <div class="title">КоляДжамп<small id="heroLabel">ВЫБЕРИ ГЕРОЯ</small></div>
+  <button id="snd" class="sound">🔊</button>
+</div>
+<div class="hud">
+  <div class="card"><div class="lab">СЧЁТ</div><div id="score" class="val">0</div></div>
+  <div class="card"><div class="lab">ВЫСОТА</div><div id="height" class="val">0 м</div></div>
+</div>
+<div id="boost" class="boost">БУСТ</div>
+<div class="controls"><button id="L" class="ctrl">‹</button><button id="R" class="ctrl">›</button></div>
+<button id="start">▶ ИГРАТЬ</button>
+
+<div id="chooser">
+  <div class="chooseTitle">Выбери героя</div>
+  <div class="chooseSub">Герой меняет внешний вид персонажа. Механика одинаковая, чтобы рейтинг не превращался в ебаный чемпионат по поиску имбы.</div>
+  <div class="heroes">
+    <button class="heroCard selected" data-hero="pudge"><span class="check">✓</span><div class="heroArt" id="art-pudge"></div><div class="heroName">Пудж</div><div class="heroType">Мясник</div></button>
+    <button class="heroCard" data-hero="techies"><span class="check">✓</span><div class="heroArt" id="art-techies"></div><div class="heroName">Течис</div><div class="heroType">Подрывники</div></button>
+    <button class="heroCard" data-hero="lina"><span class="check">✓</span><div class="heroArt" id="art-lina"></div><div class="heroName">Лина</div><div class="heroType">Огненная магия</div></button>
+    <button class="heroCard" data-hero="rubick"><span class="check">✓</span><div class="heroArt" id="art-rubick"></div><div class="heroName">Рубик</div><div class="heroType">Великий маг</div></button>
+    <button class="heroCard" data-hero="tide"><span class="check">✓</span><div class="heroArt" id="art-tide"></div><div class="heroName">Тайдхантер</div><div class="heroType">Морской громила</div></button>
+  </div>
+  <button id="chooseBtn">Играть за Пуджа</button>
+  <div class="tip">Выбор можно поменять при следующем входе в КоляДжамп.</div>
+</div>
+</div>
+
+<script>
+const c=document.querySelector('#g'),x=c.getContext('2d'),W=c.width,H=c.height,$=s=>document.querySelector(s);
+let run=0,left=0,right=0,cam=0,score=0,height=0,last=0,sound=1,plats=[],items=[];
+let selectedHero='pudge';
+let player={x:196,y:610,w:58,h:86,vx:0,vy:-760};
+
+const heroMeta={
+  pudge:{name:'Пудж',body:'#58663a',body2:'#2a331e',skin:'#b59a76',accent:'#9b2f2f'},
+  techies:{name:'Течис',body:'#8b5528',body2:'#4c2c17',skin:'#cf9a68',accent:'#f1c84a'},
+  lina:{name:'Лина',body:'#7f1f18',body2:'#3e0f0d',skin:'#e2af8c',accent:'#ff7a38'},
+  rubick:{name:'Рубик',body:'#1b5a3d',body2:'#0d2d20',skin:'#9bc49c',accent:'#8cf58b'},
+  tide:{name:'Тайдхантер',body:'#2b7766',body2:'#133a35',skin:'#5eaa8e',accent:'#b9e481'}
+};
+
+const fart=new Audio('./kolyajump-fart.mp3');
+const burp=new Audio('./kolyajump-burp.mp3');
+fart.playbackRate=1.8;
+burp.playbackRate=1.2;
+
+function play(a){if(!sound)return;a.pause();a.currentTime=0;a.play().catch(()=>{})}
+function diff(){let l=Math.min(12,1+Math.floor(height/150));return{l,g:1850+l*65,j:755+l*5,gap:82+l*5,w:115-l*4.5,spd:1+(l-1)*.05}}
+
+function add(y){
+  let d=diff(),w=Math.max(55,d.w+Math.random()*35);
+  let p={x:18+Math.random()*(W-w-36),y,w,h:15,type:Math.random()<Math.min(.32,d.l*.025)?'move':Math.random()<Math.min(.22,(d.l-2)*.025)?'break':'normal',base:0,ph:Math.random()*6.28,dead:0};
+  p.base=p.x;plats.push(p);
+  if(Math.random()<.085){
+    items.push({x:p.x+w/2,y:y-35,t:['🍺','🍸','🥃','🌵'][Math.floor(Math.random()*4)],on:1})
+  }
+}
+
+function reset(){
+  score=height=cam=0;
+  player={x:196,y:610,w:58,h:86,vx:0,vy:-760};
+  plats=[];items=[];
+  let y=690;
+  plats.push({x:155,y,w:140,h:15,type:'normal',base:155,ph:0,dead:0});
+  for(let i=0;i<16;i++){y-=90+Math.random()*30;add(y)}
+  draw(0)
+}
+
+function rr(a,b,w,h,r){x.beginPath();x.roundRect(a,b,w,h,r)}
+
+function bg(){
+  let g=x.createLinearGradient(0,0,0,H);
+  g.addColorStop(0,'#12383b');g.addColorStop(.5,'#071b1e');g.addColorStop(1,'#02090b');
+  x.fillStyle=g;x.fillRect(0,0,W,H);
+  for(let i=0;i<45;i++){x.globalAlpha=.15+(i%5)*.06;x.fillStyle='#dffffb';x.fillRect((i*89)%W,(i*137)%H,1.5,1.5)}
+  x.globalAlpha=1
+}
+
+function bottle(o,t){
+  if(!o.on)return;
+  let yy=o.y-cam+Math.sin(t*.004+o.x)*4;
+  if(yy<-30||yy>H)return;
+  x.font='28px sans-serif';x.textAlign='center';x.shadowColor='#81d8d0';x.shadowBlur=14;x.fillText(o.t,o.x,yy);x.shadowBlur=0
+}
+
+function drawHero(){
+  const m=heroMeta[selectedHero], y=player.y-cam, px=player.x, cx=px+29;
+
+  x.save();
+  x.translate(cx,y+48);
+  x.rotate(Math.max(-.14,Math.min(.14,player.vx/1700)));
+  x.translate(-cx,-(y+48));
+
+  x.strokeStyle=m.body2;x.lineWidth=11;x.lineCap='round';
+  x.beginPath();x.moveTo(px+22,y+61);x.lineTo(px+16,y+81);x.moveTo(px+36,y+61);x.lineTo(px+43,y+81);x.stroke();
+
+  x.strokeStyle=m.skin;x.lineWidth=10;
+  x.beginPath();x.moveTo(px+15,y+38);x.lineTo(px+4,y+52);x.moveTo(px+43,y+38);x.lineTo(px+54,y+51);x.stroke();
+
+  let g=x.createLinearGradient(0,y+27,0,y+68);
+  g.addColorStop(0,m.body);g.addColorStop(1,m.body2);
+  x.fillStyle=g;rr(px+9,y+26,40,42,14);x.fill();
+  x.fillStyle=m.accent;rr(px+19,y+35,20,5,2);x.fill();
+
+  x.fillStyle=m.skin;x.beginPath();x.arc(cx,y+18,24,0,Math.PI*2);x.fill();
+
+  if(selectedHero==='pudge'){
+    x.fillStyle='#5a2a24';rr(cx-20,y+8,40,8,4);x.fill();
+    x.strokeStyle='#6d2b25';x.lineWidth=3;x.beginPath();x.moveTo(cx-15,y+29);x.lineTo(cx+14,y+29);x.stroke();
+    x.fillStyle='#d2c49c';x.fillRect(cx-17,y+16,5,5);x.fillRect(cx+12,y+16,5,5);
+  }else if(selectedHero==='techies'){
+    x.fillStyle='#51311c';x.beginPath();x.arc(cx,y+8,24,3.2,6.15);x.fill();
+    x.fillStyle='#f1c84a';x.beginPath();x.arc(cx-9,y+18,4,0,Math.PI*2);x.arc(cx+9,y+18,4,0,Math.PI*2);x.fill();
+    x.fillStyle='#633919';rr(cx-18,y-2,36,7,3);x.fill();
+  }else if(selectedHero==='lina'){
+    x.fillStyle='#d64d2c';x.beginPath();x.arc(cx,y+4,25,3.2,6.2);x.fill();
+    x.fillStyle='#ff8f55';x.beginPath();x.moveTo(cx-22,y+1);x.lineTo(cx-7,y-16);x.lineTo(cx-3,y+2);x.lineTo(cx+9,y-18);x.lineTo(cx+21,y+3);x.fill();
+    x.fillStyle='#4a241c';x.fillRect(cx-13,y+17,4,3);x.fillRect(cx+9,y+17,4,3);
+  }else if(selectedHero==='rubick'){
+    x.fillStyle='#102e20';x.beginPath();x.moveTo(cx-24,y+9);x.lineTo(cx,y-17);x.lineTo(cx+24,y+9);x.closePath();x.fill();
+    x.fillStyle='#8cf58b';x.beginPath();x.arc(cx-9,y+17,4,0,Math.PI*2);x.arc(cx+9,y+17,4,0,Math.PI*2);x.fill();
+    x.strokeStyle='#8cf58b';x.lineWidth=3;x.beginPath();x.arc(cx,y+23,12,.2,Math.PI-.2);x.stroke();
+  }else if(selectedHero==='tide'){
+    x.fillStyle='#23564e';x.beginPath();x.arc(cx,y+6,25,3.2,6.2);x.fill();
+    x.fillStyle='#d7ef9a';x.beginPath();x.moveTo(cx-15,y+29);x.lineTo(cx-10,y+20);x.lineTo(cx-5,y+29);x.moveTo(cx+5,y+29);x.lineTo(cx+10,y+20);x.lineTo(cx+15,y+29);x.fill();
+    x.fillStyle='#132724';x.fillRect(cx-13,y+16,4,3);x.fillRect(cx+9,y+16,4,3);
+  }
+
+  x.strokeStyle='rgba(223,255,251,.72)';x.lineWidth=2;x.beginPath();x.arc(cx,y+18,24,0,Math.PI*2);x.stroke();
+  x.restore();
+}
+
+function draw(t){
+  bg();
+  for(let p of plats){
+    let yy=p.y-cam;if(yy<-30||yy>H+30||p.dead)continue;
+    let gr=x.createLinearGradient(0,yy,0,yy+15);
+    gr.addColorStop(0,'#c4fff9');gr.addColorStop(.35,'#81D8D0');gr.addColorStop(1,'#2b8c87');
+    x.shadowColor='#81d8d077';x.shadowBlur=18;x.fillStyle=gr;rr(p.x,yy,p.w,15,8);x.fill();x.shadowBlur=0;
+    if(p.type==='move'){x.fillStyle='#06302f';x.font='bold 11px sans-serif';x.textAlign='center';x.fillText('↔',p.x+p.w/2,yy+11)}
+    if(p.type==='break'){x.strokeStyle='#275f5c';x.beginPath();x.moveTo(p.x+p.w*.45,yy+1);x.lineTo(p.x+p.w*.52,yy+8);x.lineTo(p.x+p.w*.47,yy+14);x.stroke()}
+  }
+  items.forEach(o=>bottle(o,t));
+  drawHero();
+}
+
+function boost(o){
+  if(o.t==='🍺') play(fart); else play(burp);
+
+  $('#boost').textContent=o.t+' БУСТ';
+  $('#boost').classList.add('show');
+  setTimeout(()=>$('#boost').classList.remove('show'),650);
+
+  if(o.t==='🍺')player.vy=-900;
+  if(o.t==='🍸')player.vy=-1040;
+  if(o.t==='🥃')score+=800;
+  if(o.t==='🌵'){player.vy=-950;player.vx*=1.5}
+  score+=350
+}
+
+function upd(dt,t){
+  let d=diff();
+  if(left)player.vx-=900*dt;
+  if(right)player.vx+=900*dt;
+  if(!left&&!right)player.vx*=Math.pow(.001,dt);
+  player.vx=Math.max(-390,Math.min(390,player.vx));
+  player.x+=player.vx*dt*d.spd;
+
+  if(player.x<-50)player.x=W;
+  if(player.x>W)player.x=-50;
+
+  let old=player.y+player.h;
+  player.vy+=d.g*dt*d.spd;
+  player.y+=player.vy*dt*d.spd;
+  let now=player.y+player.h;
+
+  for(let p of plats){
+    if(p.type==='move')p.x=p.base+Math.sin(t*.0018+p.ph)*40;
+    if(!p.dead&&player.vy>0&&old<=p.y+3&&now>=p.y&&player.x+48>p.x&&player.x+10<p.x+p.w){
+      player.y=p.y-player.h;
+      player.vy=-d.j;
+      score+=100+d.l*10;
+      if(p.type==='break')setTimeout(()=>p.dead=1,80);
+      break
+    }
+  }
+
+  for(let o of items){
+    if(o.on&&Math.hypot(player.x+29-o.x,player.y+38-o.y)<36){o.on=0;boost(o)}
+  }
+
+  if(player.y-cam<H*.39){
+    let oldc=cam;
+    cam=player.y-H*.39;
+    height+=Math.max(0,oldc-cam)*.14;
+    score+=Math.max(0,oldc-cam)*.3
+  }
+
+  let min=Math.min(...plats.map(p=>p.y));
+  while(min-cam>-150){min-=d.gap+Math.random()*45;add(min)}
+  plats=plats.filter(p=>p.y-cam<H+100);
+  items=items.filter(o=>o.y-cam<H+100&&o.on);
+
+  $('#score').textContent=Math.floor(score).toLocaleString('ru');
+  $('#height').textContent=Math.floor(height)+' м';
+
+  if(player.y-cam>H+100){
+    run=0;
+    $('#start').style.display='block';
+    $('#start').textContent='↻ ЕЩЁ РАЗ';
+    return 0
+  }
+  return 1
+}
+
+function loop(t){
+  if(!run)return;
+  let dt=Math.min(.025,(t-last)/1000||.016);
+  last=t;
+  if(upd(dt,t)){draw(t);requestAnimationFrame(loop)}else draw(t)
+}
+
+function hold(id,set){
+  let e=$(id);
+  e.onpointerdown=a=>{a.preventDefault();set(1)};
+  ['onpointerup','onpointercancel','onpointerleave'].forEach(k=>e[k]=a=>{a.preventDefault();set(0)})
+}
+hold('#L',v=>left=v);
+hold('#R',v=>right=v);
+
+$('#start').onclick=()=>{
+  reset();run=1;last=performance.now();
+  $('#start').style.display='none';
+  requestAnimationFrame(loop)
+};
+
+$('#snd').onclick=e=>{sound=!sound;e.currentTarget.textContent=sound?'🔊':'🔇'};
+
+document.querySelectorAll('.heroCard').forEach(card=>{
+  card.addEventListener('click',()=>{
+    selectedHero=card.dataset.hero;
+    document.querySelectorAll('.heroCard').forEach(c=>c.classList.toggle('selected',c===card));
+    $('#chooseBtn').textContent='Играть за '+heroMeta[selectedHero].name;
+  })
+});
+
+$('#chooseBtn').onclick=()=>{
+  $('#chooser').style.display='none';
+  $('#heroLabel').textContent=heroMeta[selectedHero].name.toUpperCase();
+  try{localStorage.setItem('kolyajump.hero',selectedHero)}catch{}
+  reset()
+};
+
+function cardPortrait(el,hero){
+  const m=heroMeta[hero];
+  el.innerHTML=`<div style="width:74px;height:74px;border-radius:50%;background:${m.skin};border:3px solid ${m.accent};box-shadow:0 12px 28px #0008,0 0 25px ${m.accent}44;position:relative">
+    <div style="position:absolute;left:14px;right:14px;bottom:-18px;height:31px;border-radius:13px;background:linear-gradient(${m.body},${m.body2})"></div>
+    <div style="position:absolute;left:17px;right:17px;top:28px;height:5px;border-radius:4px;background:${m.accent}"></div>
+  </div>`;
+}
+for(const h of Object.keys(heroMeta)) cardPortrait($('#art-'+h),h);
+
+try{
+  const saved=localStorage.getItem('kolyajump.hero');
+  if(saved&&heroMeta[saved]){
+    selectedHero=saved;
+    document.querySelectorAll('.heroCard').forEach(c=>c.classList.toggle('selected',c.dataset.hero===saved));
+    $('#chooseBtn').textContent='Играть за '+heroMeta[saved].name;
+  }
+}catch{}
+
+reset();
+</script>
+</body>
+</html>
