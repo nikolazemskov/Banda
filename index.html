@@ -305,6 +305,20 @@ body.isRecording #recordingBar,body.isRecording #recordingBar *{visibility:visib
 .profileSettingText small{color:var(--muted);font-size:12px}
 .profileMusicToggle{min-width:72px!important;width:auto!important;margin:0!important}
 
+
+html,body{overscroll-behavior:none}
+#chat.active{
+  height:100dvh!important;
+  max-height:100dvh!important;
+  overflow:hidden!important;
+}
+#messages{
+  overflow-y:auto!important;
+  overscroll-behavior:contain!important;
+  overflow-anchor:none!important;
+}
+.msgrow{overflow-anchor:none}
+
 </style>
 </head>
 <body>
@@ -398,7 +412,7 @@ body.isRecording #recordingBar,body.isRecording #recordingBar *{visibility:visib
 <input id="avatarPhotoInput" type="file" accept="image/*" style="display:none">
 <label for="avatarPhotoInput" class="avatarPick" style="display:block;text-align:center;margin:12px 0 10px">Выбрать фото для аватарки</label>
 <button id="removeAvatarPhoto" class="secondary" style="width:100%;display:none;margin-bottom:10px">Удалить фото</button>
-<button id="copyInvite" class="secondary" style="width:100%">Показать код приглашения</button><div class="versionTag">КОЛЯГРАМ v8.4</div>
+<button id="copyInvite" class="secondary" style="width:100%">Показать код приглашения</button><div class="versionTag">КОЛЯГРАМ v8.5</div>
       </div>
     </div>
   </section>
@@ -666,7 +680,10 @@ document.querySelector('[data-chat="group"]').addEventListener("click",()=>openC
 $("#back").addEventListener("click",enterHome);
 
 async function openChat(type,id,name,avatar,avatar_url=null){
-  currentChat={type,id,name,avatar,avatar_url}; show("chat");
+  currentChat={type,id,name,avatar,avatar_url};
+  kolyaMessagesInitialized=false;
+  kolyaMessageIds=new Set();
+  show("chat");
   $("#chatTitle").textContent=name;
   const ca=$("#chatAvatar");
   if(avatar_url){
@@ -710,43 +727,71 @@ function msgHTML(m){
   else if(m.kind==="voice"&&m.media_url)content=`<div class="bubble ${mine?"mine":"other"}"><div class="voice voiceV66" data-voice-url="${esc(m.media_url)}"><button class="play voicePlayV66" type="button">▶</button><div class="voiceBodyV66"><input class="voiceSeekV66" type="range" min="0" max="1000" value="0" step="1"><div class="voiceInfoV66"><span class="voiceClockV66">00:00 / --:--</span><button class="voiceSpeedV66" type="button">1×</button></div></div></div><div class="meta">${fmtTime(m.created_at)}${deliveryHTML(m,mine)}</div></div>`;
   else if(m.kind==="sticker"&&m.media_url)content=`<div class="stickerMsg"><img src="${esc(m.media_url)}" alt="Эмодзи БАНДЫ" class="photoMessage" data-full-photo="${esc(m.media_url)}"><div class="stickerMeta">${fmtTime(m.created_at)}${deliveryHTML(m,mine)}</div></div>`;
   else content=`<div class="bubble ${mine?"mine":"other"}">${mine?"":`<div class="sender">${esc(m.sender_profile_name||m.sender_name)}</div>`}<div class="msgtext">${esc(m.text)}</div><div class="meta">${fmtTime(m.created_at)}${deliveryHTML(m,mine)}</div></div>`;
-  return `<div class="msgrow ${mine?"mine":""}">${mine?"":(m.sender_avatar_url?`<img class="avatar serverAvatar" src="${esc(m.sender_avatar_url)}" alt="">`:`<div class="avatar">${esc(avatar)}</div>`)}${content}</div>`;
+  return `<div class="msgrow ${mine?"mine":""}" data-message-id="${esc(m.id)}">${mine?"":(m.sender_avatar_url?`<img class="avatar serverAvatar" src="${esc(m.sender_avatar_url)}" alt="">`:`<div class="avatar">${esc(avatar)}</div>`)}${content}</div>`;
 }
-async function loadMessages(){
+let kolyaMessageIds=new Set();
+let kolyaMessagesInitialized=false;
+
+function patchDeliveryState(row,m){
+  if(!row || m.sender_id!==window.KOLYA_MY_ID)return;
+  const meta=row.querySelector(".meta,.stickerMeta");
+  if(!meta)return;
+  const old=meta.querySelector(".deliveryState");
+  if(old)old.remove();
+  meta.insertAdjacentHTML("beforeend",deliveryHTML(m,true));
+}
+
+async function loadMessages({allowSound=true}={}){
   if(READY && !window.KOLYA_MY_ID) window.KOLYA_MY_ID=await currentAuthId();
   const arr=await fetchMessages();
   const box=$("#messages");
-  const oldScrollTop=box?box.scrollTop:0;
-  const oldScrollHeight=box?box.scrollHeight:0;
-  const wasNearBottom=box ? (box.scrollHeight-box.scrollTop-box.clientHeight<140) : true;
+  if(!box)return;
 
-  const sig=kolyaSignature(arr.map(m=>({
-    id:m.id,sender_id:m.sender_id,kind:m.kind,text:m.text,media_url:m.media_url,
-    created_at:m.created_at,
-    sender_profile_name:m.sender_profile_name,sender_avatar_url:m.sender_avatar_url
-  })));
+  const wasNearBottom=(box.scrollHeight-box.scrollTop-box.clientHeight<150);
+  const oldScrollTop=box.scrollTop;
 
-  if(sig!==kolyaMessagesSignature){
-    const prevSig=kolyaMessagesSignature;
-    kolyaMessagesSignature=sig;
-    if(box){
-      box.innerHTML='<div class="dayline">Сегодня</div>'+arr.map(msgHTML).join("");
-      bindPhotoViewer(box);
+  if(!kolyaMessagesInitialized){
+    box.innerHTML='<div class="dayline">Сегодня</div>'+arr.map(msgHTML).join("");
+    bindPhotoViewer(box);
+    kolyaMessageIds=new Set(arr.map(m=>String(m.id)));
+    kolyaMessagesInitialized=true;
+    requestAnimationFrame(()=>{box.scrollTop=box.scrollHeight});
+  }else{
+    const newMessages=arr.filter(m=>!kolyaMessageIds.has(String(m.id)));
 
-      // Если пользователь был внизу, остаёмся внизу.
-      // Если читал старые сообщения, сохраняем его место, а не швыряем наверх.
+    for(const m of newMessages){
+      const holder=document.createElement("div");
+      holder.innerHTML=msgHTML(m);
+      const row=holder.firstElementChild;
+      if(row){
+        box.appendChild(row);
+        bindPhotoViewer(row);
+      }
+      kolyaMessageIds.add(String(m.id));
+
+      // Звук срабатывает и через polling, если realtime на iPhone уснул.
+      if(allowSound && m.sender_id!==window.KOLYA_MY_ID){
+        playIncomingOnce(m);
+      }
+    }
+
+    // Галочки меняем точечно, старый DOM не пересобираем.
+    for(const msg of arr){
+      const row=box.querySelector(`[data-message-id="${CSS.escape(String(msg.id))}"]`);
+      patchDeliveryState(row,msg);
+    }
+
+    if(kolyaForceBottomAfterSend || (newMessages.length && wasNearBottom)){
       requestAnimationFrame(()=>{
-        if(kolyaForceBottomAfterSend || wasNearBottom || !prevSig){
-          box.scrollTop=box.scrollHeight;
-          kolyaForceBottomAfterSend=false;
-        }else{
-          const delta=box.scrollHeight-oldScrollHeight;
-          box.scrollTop=oldScrollTop+Math.max(0,delta);
-        }
+        box.scrollTop=box.scrollHeight;
+        kolyaForceBottomAfterSend=false;
       });
+    }else if(!newMessages.length){
+      box.scrollTop=oldScrollTop;
     }
   }
-  if(READY) await markVisibleMessages();
+
+  if(READY)await markVisibleMessages();
 }
 async function baseMessage(kind,text="",url=null){
   const sender_id=await currentAuthId()||me.local_id;
@@ -762,9 +807,8 @@ async function insertMessage(obj){
     sender_id:obj.sender_id,sender_name:obj.sender_name,sender_avatar:obj.sender_avatar,
     recipient_id:obj.recipient_id,kind:obj.kind,text:obj.text,media_url:obj.media_url,created_at:obj.created_at
   }); 
-  kolyaForceBottomAfterSend=true;
-  forceChatBottomNow();
-if(error){toast("Не отправилось");return}}
+  if(error){toast("Не отправилось");return}
+  kolyaForceBottomAfterSend=true;}
   else {let arr=localAll();arr.push({...obj,id:uuid()});saveLocal(arr)}
   await loadMessages();
 }
@@ -855,7 +899,7 @@ document.addEventListener("touchend", e=>{
   lastTouchEnd=now;
 },{passive:false});
 
-if("serviceWorker" in navigator)navigator.serviceWorker.register("./sw.js?v=8.4");
+if("serviceWorker" in navigator)navigator.serviceWorker.register("./sw.js?v=8.5");
 if(me)enterHome();
 
 
@@ -1113,23 +1157,7 @@ async function markVisibleMessages(){
   }
 }
 
-async function playIncomingSound(){
-  const a=document.getElementById("messageSound");
-  if(!a)return;
-  try{
-    a.muted=false;
-    a.volume=1;
-    a.currentTime=0;
-    await a.play();
-  }catch(e){
-    try{
-      await primeNotificationAudio();
-      a.currentTime=0;
-      a.volume=1;
-      await a.play();
-    }catch(_){}
-  }
-}
+
 
 async function requestKolyagramNotifications(){
   if(!("Notification" in window))return;
@@ -1164,12 +1192,12 @@ async function startRealtime(){
       .on("postgres_changes",{event:"*",schema:"public",table:"messages"},async payload=>{
         const m=payload.new||payload.old||{};
         if(payload.eventType==="INSERT" && m.sender_id && m.sender_id!==myid){
-          duckBackgroundForNotification();
+          // immediate path; polling path below is the fallback
           playIncomingOnce(m);
           showIncomingNotification(m);
         }
+        if(document.getElementById("chat")?.classList.contains("active")) await loadMessages({allowSound:false});
         await loadPeople();
-        if(document.getElementById("chat")?.classList.contains("active")) await loadMessages();
       })
       .on("postgres_changes",{event:"*",schema:"public",table:"profiles"},async()=>{
         await loadPeople();
@@ -1188,26 +1216,12 @@ async function startRealtime(){
       try{
         if(document.getElementById("chat")?.classList.contains("active")) await loadMessages();
       }catch(e){}
-    },5000);
+    },1800);
   }
 }
 
 
-let kolyaSoundUnlocked=false;
-async function unlockKolyagramSound(){
-  if(kolyaSoundUnlocked)return;
-  const a=document.getElementById("messageSound");
-  if(!a)return;
-  try{
-    a.volume=1;
-    a.muted=true;
-    await a.play();
-    a.pause(); a.currentTime=0; a.muted=false;
-    kolyaSoundUnlocked=true;
-  }catch(e){}
-}
-document.addEventListener("click",unlockKolyagramSound,{once:true});
-document.addEventListener("touchend",unlockKolyagramSound,{once:true});
+
 
 
 
@@ -1416,24 +1430,69 @@ document.getElementById("toggleBackgroundMusic")?.addEventListener("click",async
 updateBackgroundMusicButton();
 
 
-let kolyaNotifyAudioUnlocked=false;
-async function primeNotificationAudio(){
-  if(kolyaNotifyAudioUnlocked)return;
+
+
+
+let kolyaNotifyContext=null;
+let kolyaNotifyBuffer=null;
+let kolyaNotifyLoading=null;
+
+async function prepareNotificationWebAudio(){
+  try{
+    if(!kolyaNotifyContext){
+      const Ctx=window.AudioContext||window.webkitAudioContext;
+      if(!Ctx)return false;
+      kolyaNotifyContext=new Ctx();
+    }
+    if(kolyaNotifyContext.state==="suspended")await kolyaNotifyContext.resume();
+
+    if(!kolyaNotifyBuffer){
+      if(!kolyaNotifyLoading){
+        kolyaNotifyLoading=(async()=>{
+          const r=await fetch("./message-dota-match.mp3",{cache:"force-cache"});
+          const buf=await r.arrayBuffer();
+          kolyaNotifyBuffer=await kolyaNotifyContext.decodeAudioData(buf.slice(0));
+          return kolyaNotifyBuffer;
+        })();
+      }
+      await kolyaNotifyLoading;
+    }
+    return true;
+  }catch(e){
+    return false;
+  }
+}
+
+async function playIncomingSound(){
+  duckBackgroundForNotification();
+
+  // Web Audio может играть поверх фонового <audio> в iOS/PWA.
+  if(await prepareNotificationWebAudio()){
+    try{
+      const src=kolyaNotifyContext.createBufferSource();
+      const gain=kolyaNotifyContext.createGain();
+      gain.gain.value=1.0;
+      src.buffer=kolyaNotifyBuffer;
+      src.connect(gain).connect(kolyaNotifyContext.destination);
+      src.start(0);
+      return;
+    }catch(e){}
+  }
+
+  // fallback
   const a=document.getElementById("messageSound");
   if(!a)return;
   try{
-    a.load();
-    a.volume=0.001;
-    a.muted=false;
+    a.currentTime=0;a.volume=1;a.muted=false;
     await a.play();
-    a.pause();
-    a.currentTime=0;
-    a.volume=1;
-    kolyaNotifyAudioUnlocked=true;
   }catch(e){}
 }
-document.addEventListener("pointerdown",primeNotificationAudio,{once:true});
-document.addEventListener("touchend",primeNotificationAudio,{once:true});
+
+function unlockAllKolyagramAudio(){
+  prepareNotificationWebAudio();
+}
+document.addEventListener("pointerdown",unlockAllKolyagramAudio,{once:true});
+document.addEventListener("touchend",unlockAllKolyagramAudio,{once:true});
 
 </script>
 </body>
